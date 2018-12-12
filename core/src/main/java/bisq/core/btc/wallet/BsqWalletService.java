@@ -611,10 +611,6 @@ public class BsqWalletService extends WalletService implements DaoStateListener 
     // We create a tx with Bsq inputs for the fee and optional BSQ change output.
     // As the fee amount will be missing in the output those BSQ fees are burned.
 
-    public Transaction getPreparedTradeFeeTx(Coin fee) throws InsufficientBsqException {
-        return getTxWithMultipleChangeOutputs(fee);
-    }
-
     public Transaction getPreparedProposalTx(Coin fee) throws InsufficientBsqException {
         return getTxWithMultipleChangeOutputs(fee);
     }
@@ -630,6 +626,12 @@ public class BsqWalletService extends WalletService implements DaoStateListener 
         });
         printTx("getPreparedFeeTx", tx);
         return tx;
+    }
+
+    public Transaction getPreparedTradeFeeTx(Coin fee) throws InsufficientBsqException {
+        // The trade protocol assumes that there is only one change output at the trade fee tx. So we cannot add
+        // multiple change outputs.
+        return getTxWithSingleChangeOutput(fee);
     }
 
     public Transaction getPreparedIssuanceCandidateTx(Coin fee) throws InsufficientBsqException {
@@ -693,8 +695,9 @@ public class BsqWalletService extends WalletService implements DaoStateListener 
         Transaction tx = new Transaction(params);
         tx.addOutput(new TransactionOutput(params, tx, stake, getUnusedAddress()));
         Coin amountToSpend = fee.add(stake);
+        // Got issues at testing. Not 100% clear yet why.... BSQ fee was too high
         addInputsAndGetOptionalChange(tx, amountToSpend, bsqCoinSelector)
-                .ifPresent(change -> addChangeOutputs(tx, change, getNumMissingUtxos()));
+                .ifPresent(change -> addChangeOutput(tx, change));
         printTx("getPreparedBlindVoteTx", tx);
         return tx;
     }
