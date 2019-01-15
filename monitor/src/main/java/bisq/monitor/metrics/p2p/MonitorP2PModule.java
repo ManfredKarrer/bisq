@@ -32,6 +32,10 @@ import bisq.network.p2p.peers.getdata.RequestDataManager;
 import bisq.network.p2p.peers.keepalive.KeepAliveManager;
 import bisq.network.p2p.peers.peerexchange.PeerExchangeManager;
 import bisq.network.p2p.storage.P2PDataStorage;
+import bisq.network.p2p.storage.persistence.AppendOnlyDataStoreService;
+import bisq.network.p2p.storage.persistence.PersistableNetworkPayloadListService;
+import bisq.network.p2p.storage.persistence.ProtectedDataStoreService;
+import bisq.network.p2p.storage.persistence.ResourceDataStoreService;
 
 import org.springframework.core.env.Environment;
 
@@ -54,8 +58,13 @@ public class MonitorP2PModule extends P2PModule {
         bind(MetricsModel.class).in(Singleton.class);
         bind(MonitorP2PService.class).in(Singleton.class);
 
+        bind(P2PService.class).in(Singleton.class);
         bind(PeerManager.class).in(Singleton.class);
         bind(P2PDataStorage.class).in(Singleton.class);
+        bind(AppendOnlyDataStoreService.class).in(Singleton.class);
+        bind(ProtectedDataStoreService.class).in(Singleton.class);
+        bind(PersistableNetworkPayloadListService.class).in(Singleton.class);
+        bind(ResourceDataStoreService.class).in(Singleton.class);
         bind(RequestDataManager.class).in(Singleton.class);
         bind(PeerExchangeManager.class).in(Singleton.class);
         bind(KeepAliveManager.class).in(Singleton.class);
@@ -85,5 +94,13 @@ public class MonitorP2PModule extends P2PModule {
         bindConstant().annotatedWith(named(NetworkOptionKeys.BAN_LIST)).to(environment.getRequiredProperty(NetworkOptionKeys.BAN_LIST));
         bindConstant().annotatedWith(named(NetworkOptionKeys.SOCKS_5_PROXY_BTC_ADDRESS)).to(environment.getRequiredProperty(NetworkOptionKeys.SOCKS_5_PROXY_BTC_ADDRESS));
         bindConstant().annotatedWith(named(NetworkOptionKeys.SOCKS_5_PROXY_HTTP_ADDRESS)).to(environment.getRequiredProperty(NetworkOptionKeys.SOCKS_5_PROXY_HTTP_ADDRESS));
+
+        bindConstant().annotatedWith(named(NetworkOptionKeys.TORRC_FILE)).to(environment.getRequiredProperty(NetworkOptionKeys.TORRC_FILE));
+        bindConstant().annotatedWith(named(NetworkOptionKeys.TORRC_OPTIONS)).to(environment.getRequiredProperty(NetworkOptionKeys.TORRC_OPTIONS));
+        bindConstant().annotatedWith(named(NetworkOptionKeys.EXTERNAL_TOR_CONTROL_PORT)).to(environment.getRequiredProperty(NetworkOptionKeys.EXTERNAL_TOR_CONTROL_PORT));
+        bindConstant().annotatedWith(named(NetworkOptionKeys.EXTERNAL_TOR_PASSWORD)).to(environment.getRequiredProperty(NetworkOptionKeys.EXTERNAL_TOR_PASSWORD));
+        bindConstant().annotatedWith(named(NetworkOptionKeys.EXTERNAL_TOR_COOKIE_FILE)).to(environment.getRequiredProperty(NetworkOptionKeys.EXTERNAL_TOR_COOKIE_FILE));
+        bindConstant().annotatedWith(named(NetworkOptionKeys.EXTERNAL_TOR_USE_SAFECOOKIE)).to(environment.containsProperty(NetworkOptionKeys.EXTERNAL_TOR_USE_SAFECOOKIE));
+        bindConstant().annotatedWith(named(NetworkOptionKeys.TOR_STREAM_ISOLATION)).to(environment.containsProperty(NetworkOptionKeys.TOR_STREAM_ISOLATION));
     }
 }

@@ -123,6 +123,16 @@ public class MonitorEnvironment extends BisqEnvironment {
 
                 setProperty(Storage.STORAGE_DIR, Paths.get(btcNetworkDir, "db").toString());
                 setProperty(KeyStorage.KEY_STORAGE_DIR, Paths.get(btcNetworkDir, "keys").toString());
+
+                setProperty(NetworkOptionKeys.TORRC_FILE, torRcFile);
+                setProperty(NetworkOptionKeys.TORRC_OPTIONS, torRcOptions);
+                setProperty(NetworkOptionKeys.EXTERNAL_TOR_CONTROL_PORT, externalTorControlPort);
+                setProperty(NetworkOptionKeys.EXTERNAL_TOR_PASSWORD, externalTorPassword);
+                setProperty(NetworkOptionKeys.EXTERNAL_TOR_COOKIE_FILE, externalTorCookieFile);
+                if (externalTorUseSafeCookieAuthentication)
+                    setProperty(NetworkOptionKeys.EXTERNAL_TOR_USE_SAFECOOKIE, "true");
+                if (torStreamIsolation)
+                    setProperty(NetworkOptionKeys.TOR_STREAM_ISOLATION, "true");
             }
         });
     }
