@@ -62,6 +62,7 @@ configure(subprojects) {
 
 configure([project(':desktop'),
            project(':monitor'),
+           project(':dao-monitor'),
            project(':relay'),
            project(':seednode'),
            project(':statsnode')]) {
@@ -88,6 +89,7 @@ configure([project(':desktop'),
             // The .bat files are also deleted.
             delete fileTree(dir: "$destinationDir/bin", include: 'desktop*')
             delete fileTree(dir: "$destinationDir/bin", include: 'monitor*')
+            delete fileTree(dir: "$destinationDir/bin", include: 'dao-monitor*')
             delete fileTree(dir: "$destinationDir/bin", include: 'seednode*')
             delete fileTree(dir: "$destinationDir/bin", include: 'pricenode*')
             delete fileTree(dir: "$destinationDir/bin", include: 'statsnode*')
@@ -312,6 +314,18 @@ configure(project(':desktop')) {
 
 configure(project(':monitor')) {
     mainClassName = 'bisq.monitor.MonitorMain'
+
+    dependencies {
+        compile project(':core')
+        compile "com.sparkjava:spark-core:$sparkVersion"
+        compile 'net.gpedro.integrations.slack:slack-webhook:1.1.1'
+        compileOnly "org.projectlombok:lombok:$lombokVersion"
+        annotationProcessor "org.projectlombok:lombok:$lombokVersion"
+    }
+}
+
+configure(project(':dao-monitor')) {
+    mainClassName = 'bisq.daomonitor.MonitorMain'
 
     dependencies {
         compile project(':core')
