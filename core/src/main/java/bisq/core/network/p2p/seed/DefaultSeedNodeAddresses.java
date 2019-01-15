@@ -82,6 +82,9 @@ class DefaultSeedNodeAddresses {
             // new NodeAddress("vjkh4ykq7x5skdlt.onion:8001"), // local dev test
             new NodeAddress("fjr5w4eckjghqtnu.onion:8001"), // testnet seed 1
             new NodeAddress("74w2sttlo4qk6go3.onion:8001"), // testnet seed 2
+            new NodeAddress("gtif46mfxirv533z.onion:8001"), // testnet explorer 146.185.139.203 / https://explorer.bisq.network/
+            new NodeAddress("snenz4mea65wigen.onion:8001"), // testnet explorer 2 explorer.sqrrm.net
+
 
             // BTC regtest
             // For development you need to change that to your local onion addresses
