@@ -17,30 +17,146 @@
 
 package bisq.daomonitor;
 
+import bisq.core.app.BisqSetup;
+import bisq.core.app.HeadlessApp;
+import bisq.core.trade.TradeManager;
+
+import bisq.common.UserThread;
+import bisq.common.setup.GracefulShutDownHandler;
+import bisq.common.storage.CorruptedDatabaseFilesHandler;
+import bisq.common.util.Profiler;
+
 import com.google.inject.Injector;
+
+import java.util.concurrent.TimeUnit;
 
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
+import static spark.Spark.port;
+
 
 
 import bisq.daomonitor.metrics.DaoMetricsModel;
+import spark.Spark;
 
 @Slf4j
-public class DaoMonitor {
-    @Setter
-    private Injector injector;
+public class DaoMonitor implements HeadlessApp {
+    private static final long LOG_MEMORY_PERIOD_MIN = 10;
     @Getter
+    private static Runnable shutDownHandler;
+
+    @Setter
+    protected Injector injector;
+    @Setter
+    private GracefulShutDownHandler gracefulShutDownHandler;
+    private boolean shutDownRequested;
+    private BisqSetup bisqSetup;
+    private CorruptedDatabaseFilesHandler corruptedDatabaseFilesHandler;
+    private TradeManager tradeManager;
     private DaoMetricsModel daoMetricsModel;
 
     public DaoMonitor() {
+        shutDownHandler = this::stop;
     }
 
     public void startApplication() {
-        daoMetricsModel = injector.getInstance(DaoMetricsModel.class);
+        try {
+            bisqSetup = injector.getInstance(BisqSetup.class);
+            bisqSetup.addBisqSetupCompleteListener(this);
 
-        DaoMonitorAppSetup appSetup = injector.getInstance(DaoMonitorAppSetup.class);
-        appSetup.start();
+            corruptedDatabaseFilesHandler = injector.getInstance(CorruptedDatabaseFilesHandler.class);
+            tradeManager = injector.getInstance(TradeManager.class);
+
+            daoMetricsModel = injector.getInstance(DaoMetricsModel.class);
+
+            setupHandlers();
+
+            startHttpServer("8081");
+
+            UserThread.runPeriodically(() -> Profiler.printSystemLoad(log), LOG_MEMORY_PERIOD_MIN, TimeUnit.MINUTES);
+        } catch (Throwable throwable) {
+            log.error("Error during app init", throwable);
+            handleUncaughtException(throwable, false);
+        }
+    }
+
+    private void startHttpServer(String port) {
+        port(Integer.parseInt(port));
+        Spark.get("/", (req, res) -> {
+            log.info("Incoming request from: " + req.userAgent());
+            final String resultAsHtml = daoMetricsModel.getResultAsHtml();
+            return resultAsHtml == null ? "Still starting up..." : resultAsHtml;
+        });
+    }
+
+    @Override
+    public void onSetupComplete() {
+        log.info("onSetupComplete");
+    }
+
+    protected void setupHandlers() {
+        bisqSetup.setDisplayTacHandler(acceptedHandler -> {
+            log.info("onDisplayTacHandler: We accept the tacs automatically in headless mode");
+            acceptedHandler.run();
+        });
+        bisqSetup.setCryptoSetupFailedHandler(msg -> log.info("onCryptoSetupFailedHandler: msg={}", msg));
+        bisqSetup.setDisplayTorNetworkSettingsHandler(show -> log.info("onDisplayTorNetworkSettingsHandler: show={}", show));
+        bisqSetup.setSpvFileCorruptedHandler(msg -> log.info("onSpvFileCorruptedHandler: msg={}", msg));
+        bisqSetup.setChainFileLockedExceptionHandler(msg -> log.info("onChainFileLockedExceptionHandler: msg={}", msg));
+        bisqSetup.setLockedUpFundsHandler(msg -> log.info("onLockedUpFundsHandler: msg={}", msg));
+        bisqSetup.setShowFirstPopupIfResyncSPVRequestedHandler(() -> log.info("onShowFirstPopupIfResyncSPVRequestedHandler"));
+        bisqSetup.setRequestWalletPasswordHandler(aesKeyHandler -> log.info("onRequestWalletPasswordHandler"));
+        bisqSetup.setDisplayUpdateHandler((alert, key) -> log.info("onDisplayUpdateHandler"));
+        bisqSetup.setDisplayAlertHandler(alert -> log.info("onDisplayAlertHandler. alert={}", alert));
+        bisqSetup.setDisplayPrivateNotificationHandler(privateNotification -> log.info("onDisplayPrivateNotificationHandler. privateNotification={}", privateNotification));
+        bisqSetup.setDaoErrorMessageHandler(errorMessage -> log.info("onDaoErrorMessageHandler. errorMessage={}", errorMessage));
+        bisqSetup.setDaoWarnMessageHandler(warnMessage -> log.info("onDaoWarnMessageHandler. warnMessage={}", warnMessage));
+        bisqSetup.setDisplaySecurityRecommendationHandler(key -> log.info("onDisplaySecurityRecommendationHandler"));
+        bisqSetup.setDisplayLocalhostHandler(key -> log.info("onDisplayLocalhostHandler"));
+        bisqSetup.setWrongOSArchitectureHandler(msg -> log.info("onWrongOSArchitectureHandler. msg={}", msg));
+        bisqSetup.setVoteResultExceptionHandler(voteResultException -> log.info("voteResultException={}", voteResultException));
+
+        //TODO move to bisqSetup
+        corruptedDatabaseFilesHandler.getCorruptedDatabaseFiles().ifPresent(files -> log.info("getCorruptedDatabaseFiles. files={}", files));
+        tradeManager.setTakeOfferRequestErrorMessageHandler(errorMessage -> log.info("onTakeOfferRequestErrorMessageHandler"));
+    }
+
+    public void stop() {
+        if (!shutDownRequested) {
+            UserThread.runAfter(() -> {
+                gracefulShutDownHandler.gracefulShutDown(() -> {
+                    log.debug("App shutdown complete");
+                });
+            }, 200, TimeUnit.MILLISECONDS);
+            shutDownRequested = true;
+        }
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    // UncaughtExceptionHandler implementation
+    ///////////////////////////////////////////////////////////////////////////////////////////
+
+    @Override
+    public void handleUncaughtException(Throwable throwable, boolean doShutDown) {
+        if (!shutDownRequested) {
+            try {
+                try {
+                    log.error(throwable.getMessage());
+                } catch (Throwable throwable3) {
+                    log.error("Error at displaying Throwable.");
+                    throwable3.printStackTrace();
+                }
+                if (doShutDown)
+                    stop();
+            } catch (Throwable throwable2) {
+                // If printStackTrace cause a further exception we don't pass the throwable to the Popup.
+                log.error(throwable2.toString());
+                if (doShutDown)
+                    stop();
+            }
+        }
     }
 }

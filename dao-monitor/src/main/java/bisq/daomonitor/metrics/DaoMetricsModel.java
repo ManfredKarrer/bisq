@@ -33,7 +33,6 @@ import net.gpedro.integrations.slack.SlackMessage;
 import org.bitcoinj.core.Peer;
 
 import javax.inject.Inject;
-import javax.inject.Named;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
@@ -61,10 +60,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-
-
-import bisq.daomonitor.DaoMonitorOptionKeys;
-
 @Slf4j
 public class DaoMetricsModel {
     private final DateFormat dateFormat = new SimpleDateFormat("MMMMM dd, HH:mm:ss");
@@ -89,18 +84,18 @@ public class DaoMetricsModel {
     @Inject
     public DaoMetricsModel(SeedNodeRepository seedNodeRepository,
                            BtcNodes btcNodes,
-                           WalletsSetup walletsSetup,
+                           WalletsSetup walletsSetup/*,
                            @Named(DaoMonitorOptionKeys.SLACK_URL_SEED_CHANNEL) String slackUrlSeedChannel,
                            @Named(DaoMonitorOptionKeys.SLACK_BTC_SEED_CHANNEL) String slackUrlBtcChannel,
-                           @Named(DaoMonitorOptionKeys.SLACK_PROVIDER_SEED_CHANNEL) String slackUrlProviderChannel) {
+                           @Named(DaoMonitorOptionKeys.SLACK_PROVIDER_SEED_CHANNEL) String slackUrlProviderChannel*/) {
         this.seedNodeRepository = seedNodeRepository;
         this.btcNodes = btcNodes;
-        if (!slackUrlSeedChannel.isEmpty())
+       /* if (!slackUrlSeedChannel.isEmpty())
             slackSeedApi = new SlackApi(slackUrlSeedChannel);
         if (!slackUrlBtcChannel.isEmpty())
             slackBtcApi = new SlackApi(slackUrlBtcChannel);
         if (!slackUrlProviderChannel.isEmpty())
-            slackProviderApi = new SlackApi(slackUrlProviderChannel);
+            slackProviderApi = new SlackApi(slackUrlProviderChannel);*/
 
         walletsSetup.connectedPeersProperty().addListener((observable, oldValue, newValue) -> {
             connectedPeers = newValue;
