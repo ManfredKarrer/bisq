@@ -35,4 +35,28 @@ public class DaoMetrics {
     long lastDataResponseTs;
     @Setter
     long numRequestAttempts;
+
+    public DaoMetrics() {
+    }
+
+    public DaoMetrics(DaoMetrics daoMetrics) {
+        this.requestDurations = new ArrayList<>(daoMetrics.requestDurations);
+        this.errorMessages = new ArrayList<>(daoMetrics.errorMessages);
+        this.receivedObjectsList = new ArrayList<>(daoMetrics.receivedObjectsList);
+        this.lastDataRequestTs = daoMetrics.lastDataRequestTs;
+        this.lastDataResponseTs = daoMetrics.lastDataResponseTs;
+        this.numRequestAttempts = daoMetrics.numRequestAttempts;
+    }
+
+    @Override
+    public String toString() {
+        return "DaoMetrics{" +
+                "\n     requestDurations=" + requestDurations +
+                ",\n     errorMessages=" + errorMessages +
+                ",\n     receivedObjectsList=" + receivedObjectsList +
+                ",\n     lastDataRequestTs=" + lastDataRequestTs +
+                ",\n     lastDataResponseTs=" + lastDataResponseTs +
+                ",\n     numRequestAttempts=" + numRequestAttempts +
+                "\n}";
+    }
 }

@@ -17,7 +17,6 @@
 
 package bisq.daomonitor;
 
-import bisq.core.CoreModule;
 import bisq.core.app.BisqExecutable;
 
 import bisq.common.UserThread;
@@ -93,7 +92,7 @@ public class DaoMonitorMain extends BisqExecutable {
 
     @Override
     protected AppModule getModule() {
-        return new CoreModule(bisqEnvironment);
+        return new DaoMonitorAppModule(bisqEnvironment);
     }
 
     @Override

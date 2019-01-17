@@ -17,26 +17,30 @@
 
 package bisq.daomonitor;
 
+import bisq.core.CoreModule;
+
 import bisq.common.app.AppModule;
 
 import org.springframework.core.env.Environment;
 
-import com.google.inject.Singleton;
+class DaoMonitorAppModule extends AppModule {
 
-
-
-import bisq.daomonitor.metrics.DaoMetricsModel;
-import bisq.daomonitor.metrics.p2p.DaoMonitorRequestManager;
-
-public class DaoMonitorModule extends AppModule {
-
-    public DaoMonitorModule(Environment environment) {
+    public DaoMonitorAppModule(Environment environment) {
         super(environment);
     }
 
     @Override
     protected void configure() {
-        bind(DaoMetricsModel.class).in(Singleton.class);
-        bind(DaoMonitorRequestManager.class).in(Singleton.class);
+        install(coreModule());
+        install(daoMonitorModule());
+    }
+
+    private CoreModule coreModule() {
+        return new CoreModule(environment);
+    }
+
+    private DaoMonitorModule daoMonitorModule() {
+        return new DaoMonitorModule(environment);
     }
 }
+

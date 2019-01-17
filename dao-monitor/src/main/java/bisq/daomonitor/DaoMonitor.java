@@ -39,6 +39,7 @@ import static spark.Spark.port;
 
 
 import bisq.daomonitor.metrics.DaoMetricsModel;
+import bisq.daomonitor.metrics.p2p.DaoMonitorRequestManager;
 import spark.Spark;
 
 @Slf4j
@@ -56,6 +57,7 @@ public class DaoMonitor implements HeadlessApp {
     private CorruptedDatabaseFilesHandler corruptedDatabaseFilesHandler;
     private TradeManager tradeManager;
     private DaoMetricsModel daoMetricsModel;
+    private DaoMonitorRequestManager requestDataManager;
 
     public DaoMonitor() {
         shutDownHandler = this::stop;
@@ -69,11 +71,12 @@ public class DaoMonitor implements HeadlessApp {
             corruptedDatabaseFilesHandler = injector.getInstance(CorruptedDatabaseFilesHandler.class);
             tradeManager = injector.getInstance(TradeManager.class);
 
+            requestDataManager = injector.getInstance(DaoMonitorRequestManager.class);
             daoMetricsModel = injector.getInstance(DaoMetricsModel.class);
 
             setupHandlers();
 
-            startHttpServer("8081");
+            startHttpServer("80");
 
             UserThread.runPeriodically(() -> Profiler.printSystemLoad(log), LOG_MEMORY_PERIOD_MIN, TimeUnit.MINUTES);
         } catch (Throwable throwable) {

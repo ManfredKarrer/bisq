@@ -27,9 +27,6 @@ import bisq.network.p2p.seed.SeedNodeRepository;
 import bisq.common.util.MathUtils;
 import bisq.common.util.Tuple2;
 
-import net.gpedro.integrations.slack.SlackApi;
-import net.gpedro.integrations.slack.SlackMessage;
-
 import org.bitcoinj.core.Peer;
 
 import javax.inject.Inject;
@@ -68,13 +65,13 @@ public class DaoMetricsModel {
     @Getter
     private String resultAsHtml;
     private SeedNodeRepository seedNodeRepository;
-    private SlackApi slackSeedApi, slackBtcApi, slackProviderApi;
     private BtcNodes btcNodes;
     @Setter
     private long lastCheckTs;
     private long btcNodeUptimeTs;
     private int totalErrors = 0;
-    private HashMap<NodeAddress, DaoMetrics> map = new HashMap<>();
+    private Map<NodeAddress, DaoMetrics> p2pDataMap = new HashMap<>();
+    private Map<NodeAddress, DaoMetrics> blocksMap = new HashMap<>();
     private List<Peer> connectedPeers;
     private Map<Tuple2<BtcNodes.BtcNode, Boolean>, Integer> btcNodeDownTimeMap = new HashMap<>();
     private Map<Tuple2<BtcNodes.BtcNode, Boolean>, Integer> btcNodeUpTimeMap = new HashMap<>();
@@ -84,30 +81,29 @@ public class DaoMetricsModel {
     @Inject
     public DaoMetricsModel(SeedNodeRepository seedNodeRepository,
                            BtcNodes btcNodes,
-                           WalletsSetup walletsSetup/*,
-                           @Named(DaoMonitorOptionKeys.SLACK_URL_SEED_CHANNEL) String slackUrlSeedChannel,
-                           @Named(DaoMonitorOptionKeys.SLACK_BTC_SEED_CHANNEL) String slackUrlBtcChannel,
-                           @Named(DaoMonitorOptionKeys.SLACK_PROVIDER_SEED_CHANNEL) String slackUrlProviderChannel*/) {
+                           WalletsSetup walletsSetup) {
         this.seedNodeRepository = seedNodeRepository;
         this.btcNodes = btcNodes;
-       /* if (!slackUrlSeedChannel.isEmpty())
-            slackSeedApi = new SlackApi(slackUrlSeedChannel);
-        if (!slackUrlBtcChannel.isEmpty())
-            slackBtcApi = new SlackApi(slackUrlBtcChannel);
-        if (!slackUrlProviderChannel.isEmpty())
-            slackProviderApi = new SlackApi(slackUrlProviderChannel);*/
 
         walletsSetup.connectedPeersProperty().addListener((observable, oldValue, newValue) -> {
             connectedPeers = newValue;
         });
     }
 
-    public void addToMap(NodeAddress nodeAddress, DaoMetrics daoMetrics) {
-        map.put(nodeAddress, daoMetrics);
+    public void addToP2PDataMap(NodeAddress nodeAddress, DaoMetrics daoMetrics) {
+        p2pDataMap.put(nodeAddress, daoMetrics);
     }
 
-    public DaoMetrics getMetrics(NodeAddress nodeAddress) {
-        return map.get(nodeAddress);
+    public DaoMetrics getP2PDataMetrics(NodeAddress nodeAddress) {
+        return p2pDataMap.get(nodeAddress);
+    }
+
+    public void addToBlockDataMap(NodeAddress nodeAddress, DaoMetrics daoMetrics) {
+        blocksMap.put(nodeAddress, daoMetrics);
+    }
+
+    public DaoMetrics getBlockMetrics(NodeAddress nodeAddress) {
+        return blocksMap.get(nodeAddress);
     }
 
     public void updateReport() {
@@ -116,12 +112,27 @@ public class DaoMetricsModel {
 
         Map<String, Double> accumulatedValues = new HashMap<>();
         final double[] items = {0};
-        List<Map.Entry<NodeAddress, DaoMetrics>> entryList = map.entrySet().stream()
+
+        Map<NodeAddress, DaoMetrics> mergedMap = new HashMap<>();
+        blocksMap.forEach((node, value) -> {
+            DaoMetrics metrics = new DaoMetrics(p2pDataMap.get(node));
+            List<Map<String, Integer>> receivedObjectsList = value.getReceivedObjectsList();
+            List<Map<String, Integer>> receivedObjectsList1 = metrics.getReceivedObjectsList();
+            mergedMap.put(node, metrics);
+            if (!receivedObjectsList1.isEmpty()) {
+                Map<String, Integer> objects = receivedObjectsList1.get(0);
+                receivedObjectsList.forEach(e1 -> {
+                    e1.forEach(objects::put);
+                });
+            }
+        });
+
+        List<Map.Entry<NodeAddress, DaoMetrics>> entryList = mergedMap.entrySet().stream()
                 .sorted(Comparator.comparing(entrySet -> seedNodeRepository.getOperator(entrySet.getKey())))
                 .collect(Collectors.toList());
 
         totalErrors = 0;
-        entryList.stream().forEach(e -> {
+        entryList.forEach(e -> {
             totalErrors += e.getValue().errorMessages.stream().filter(s -> !s.isEmpty()).count();
             final List<Map<String, Integer>> receivedObjectsList = e.getValue().getReceivedObjectsList();
             if (!receivedObjectsList.isEmpty()) {
@@ -248,13 +259,6 @@ public class DaoMetricsModel {
                         color = "red";
 
                     html.append("<font color=\"" + color + "\">" + str + "</font>").append("<br/>");
-
-                    if (devAbs >= 20) {
-                        if (slackSeedApi != null)
-                            slackSeedApi.call(new SlackMessage("Warning: " + nodeAddress.getFullAddress(),
-                                    "<" + seedNodeRepository.getOperator(nodeAddress) + ">" + " Your seed node delivers diverging results for " + dataItem + ". " +
-                                            "Please check the monitoring status page at http://seedmonitor.0-2-1.net:8080/"));
-                    }
                 });
                 sb.append("Duration all requests: ").append(allDurationsString)
                         .append("\nAll data: ").append(allReceivedDataString).append("\n");

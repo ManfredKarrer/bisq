@@ -18,6 +18,8 @@
 package bisq.daomonitor.metrics.p2p;
 
 import bisq.network.p2p.NodeAddress;
+import bisq.network.p2p.P2PService;
+import bisq.network.p2p.P2PServiceListener;
 import bisq.network.p2p.network.CloseConnectionReason;
 import bisq.network.p2p.network.Connection;
 import bisq.network.p2p.network.ConnectionListener;
@@ -28,11 +30,7 @@ import bisq.network.p2p.storage.P2PDataStorage;
 import bisq.common.Timer;
 import bisq.common.UserThread;
 
-import net.gpedro.integrations.slack.SlackApi;
-import net.gpedro.integrations.slack.SlackMessage;
-
 import javax.inject.Inject;
-import javax.inject.Named;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -46,7 +44,6 @@ import lombok.extern.slf4j.Slf4j;
 
 
 
-import bisq.daomonitor.DaoMonitorOptionKeys;
 import bisq.daomonitor.metrics.DaoMetrics;
 import bisq.daomonitor.metrics.DaoMetricsModel;
 
@@ -65,17 +62,22 @@ public class DaoMonitorRequestManager implements ConnectionListener {
     private final NetworkNode networkNode;
     private final int numNodes;
 
-    private SlackApi slackApi;
     private P2PDataStorage dataStorage;
     private SeedNodeRepository seedNodeRepository;
     private DaoMetricsModel daoMetricsModel;
     private final Set<NodeAddress> seedNodeAddresses;
 
-    private final Map<NodeAddress, DaoMonitorRequestHandler> handlerMap = new HashMap<>();
-    private Map<NodeAddress, Timer> retryTimerMap = new HashMap<>();
-    private Map<NodeAddress, Integer> retryCounterMap = new HashMap<>();
+    private final Map<NodeAddress, DaoMonitorP2PDataRequestHandler> p2pDataHandlerMap = new HashMap<>();
+    private final Map<NodeAddress, DaoMonitorBlockRequestHandler> blocksHandlerMap = new HashMap<>();
+
+    private Map<NodeAddress, Timer> p2pDataRetryTimerMap = new HashMap<>();
+    private Map<NodeAddress, Timer> blocksRetryTimerMap = new HashMap<>();
+
+    private Map<NodeAddress, Integer> p2pDataRetryCounterMap = new HashMap<>();
+    private Map<NodeAddress, Integer> blocksRetryCounterMap = new HashMap<>();
     private boolean stopped;
-    private int completedRequestIndex;
+    private int completedP2PDataRequestIndex;
+    private int completedBlocksRequestIndex;
 
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Constructor
@@ -83,22 +85,56 @@ public class DaoMonitorRequestManager implements ConnectionListener {
 
     @Inject
     public DaoMonitorRequestManager(NetworkNode networkNode,
+                                    P2PService p2PService,
                                     P2PDataStorage dataStorage,
                                     SeedNodeRepository seedNodeRepository,
-                                    DaoMetricsModel daoMetricsModel,
-                                    @Named(DaoMonitorOptionKeys.SLACK_URL_SEED_CHANNEL) String slackUrlSeedChannel) {
+                                    DaoMetricsModel daoMetricsModel) {
         this.networkNode = networkNode;
         this.dataStorage = dataStorage;
         this.seedNodeRepository = seedNodeRepository;
         this.daoMetricsModel = daoMetricsModel;
 
-        if (!slackUrlSeedChannel.isEmpty())
-            slackApi = new SlackApi(slackUrlSeedChannel);
         this.networkNode.addConnectionListener(this);
 
         seedNodeAddresses = new HashSet<>(seedNodeRepository.getSeedNodeAddresses());
-        seedNodeAddresses.stream().forEach(nodeAddress -> daoMetricsModel.addToMap(nodeAddress, new DaoMetrics()));
+        seedNodeAddresses.forEach(nodeAddress -> daoMetricsModel.addToP2PDataMap(nodeAddress, new DaoMetrics()));
+        seedNodeAddresses.forEach(nodeAddress -> daoMetricsModel.addToBlockDataMap(nodeAddress, new DaoMetrics()));
         numNodes = seedNodeAddresses.size();
+
+        p2PService.addP2PServiceListener(new P2PServiceListener() {
+            @Override
+            public void onDataReceived() {
+            }
+
+            @Override
+            public void onNoSeedNodeAvailable() {
+            }
+
+            @Override
+            public void onNoPeersAvailable() {
+            }
+
+            @Override
+            public void onUpdatedDataReceived() {
+            }
+
+            @Override
+            public void onTorNodeReady() {
+            }
+
+            @Override
+            public void onHiddenServicePublished() {
+                start();
+            }
+
+            @Override
+            public void onSetupFailed(Throwable throwable) {
+            }
+
+            @Override
+            public void onRequestCustomBridges() {
+            }
+        });
     }
 
     public void shutDown() {
@@ -123,7 +159,7 @@ public class DaoMonitorRequestManager implements ConnectionListener {
 
     private void requestAllNodes() {
         stopAllRetryTimers();
-        closeAllConnections();
+        //closeAllConnections();
         // we give 1 sec. for all connection shutdown
         final int[] delay = {1000};
         daoMetricsModel.setLastCheckTs(System.currentTimeMillis());
@@ -158,81 +194,155 @@ public class DaoMonitorRequestManager implements ConnectionListener {
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     private void requestFromNode(NodeAddress nodeAddress) {
+        requestBlocksFromNode(nodeAddress);
+        requestP2PDataFromNode(nodeAddress);
+    }
+
+    private void requestBlocksFromNode(NodeAddress nodeAddress) {
         if (!stopped) {
-            if (!handlerMap.containsKey(nodeAddress)) {
-                final DaoMetrics daoMetrics = daoMetricsModel.getMetrics(nodeAddress);
-                DaoMonitorRequestHandler requestDataHandler = new DaoMonitorRequestHandler(networkNode,
-                        dataStorage,
-                        daoMetrics,
-                        new DaoMonitorRequestHandler.Listener() {
+            if (!blocksHandlerMap.containsKey(nodeAddress)) {
+                DaoMetrics blockMetrics = daoMetricsModel.getBlockMetrics(nodeAddress);
+                DaoMonitorBlockRequestHandler requestDataHandler = new DaoMonitorBlockRequestHandler(networkNode,
+                        blockMetrics,
+                        new DaoMonitorBlockRequestHandler.Listener() {
                             @Override
                             public void onComplete() {
                                 log.trace("RequestDataHandshake of outbound connection complete. nodeAddress={}",
                                         nodeAddress);
-                                stopRetryTimer(nodeAddress);
-                                retryCounterMap.remove(nodeAddress);
-                                daoMetrics.setNumRequestAttempts(retryCounterMap.getOrDefault(nodeAddress, 1));
+                                stopP2PDataRetryTimer(nodeAddress);
+                                blocksRetryCounterMap.remove(nodeAddress);
+                                blockMetrics.setNumRequestAttempts(blocksRetryCounterMap.getOrDefault(nodeAddress, 1));
 
                                 // need to remove before listeners are notified as they cause the update call
-                                handlerMap.remove(nodeAddress);
+                                blocksHandlerMap.remove(nodeAddress);
 
                                 daoMetricsModel.updateReport();
-                                completedRequestIndex++;
-                                if (completedRequestIndex == numNodes)
+                                completedBlocksRequestIndex++;
+                                if (completedBlocksRequestIndex == numNodes)
                                     daoMetricsModel.log();
 
                                 if (daoMetricsModel.getNodesInError().contains(nodeAddress)) {
                                     daoMetricsModel.removeNodesInError(nodeAddress);
-                                    if (slackApi != null)
-                                        slackApi.call(new SlackMessage("Fixed: " + nodeAddress.getFullAddress(),
-                                                "<" + seedNodeRepository.getOperator(nodeAddress) + ">" + " Your seed node is recovered."));
                                 }
                             }
 
                             @Override
                             public void onFault(String errorMessage, NodeAddress nodeAddress) {
-                                handlerMap.remove(nodeAddress);
-                                stopRetryTimer(nodeAddress);
+                                blocksHandlerMap.remove(nodeAddress);
+                                stopBlocksRetryTimer(nodeAddress);
 
-                                int retryCounter = retryCounterMap.getOrDefault(nodeAddress, 0);
-                                daoMetrics.setNumRequestAttempts(retryCounter);
+                                int retryCounter = blocksRetryCounterMap.getOrDefault(nodeAddress, 0);
+                                blockMetrics.setNumRequestAttempts(retryCounter);
                                 if (retryCounter < MAX_RETRIES) {
                                     log.info("We got an error at peer={}. We will try again after a delay of {} sec. error={} ",
                                             nodeAddress, RETRY_DELAY_SEC, errorMessage);
                                     final Timer timer = UserThread.runAfter(() -> requestFromNode(nodeAddress), RETRY_DELAY_SEC);
-                                    retryTimerMap.put(nodeAddress, timer);
-                                    retryCounterMap.put(nodeAddress, ++retryCounter);
+                                    blocksRetryTimerMap.put(nodeAddress, timer);
+                                    blocksRetryCounterMap.put(nodeAddress, ++retryCounter);
                                 } else {
                                     log.warn("We got repeated errors at peer={}. error={} ",
                                             nodeAddress, errorMessage);
 
                                     daoMetricsModel.addNodesInError(nodeAddress);
-                                    daoMetrics.getErrorMessages().add(errorMessage + " (" + new Date().toString() + ")");
+                                    blockMetrics.getErrorMessages().add(errorMessage + " (" + new Date().toString() + ")");
 
                                     daoMetricsModel.updateReport();
-                                    completedRequestIndex++;
-                                    if (completedRequestIndex == numNodes)
+                                    completedBlocksRequestIndex++;
+                                    if (completedBlocksRequestIndex == numNodes)
                                         daoMetricsModel.log();
 
-                                    retryCounterMap.remove(nodeAddress);
-
-                                    if (slackApi != null)
-                                        slackApi.call(new SlackMessage("Error: " + nodeAddress.getFullAddress(),
-                                                "<" + seedNodeRepository.getOperator(nodeAddress) + ">" + " Your seed node failed " + RETRY_DELAY_SEC + " times with error message: " + errorMessage));
+                                    blocksRetryCounterMap.remove(nodeAddress);
                                 }
                             }
                         });
-                handlerMap.put(nodeAddress, requestDataHandler);
+                blocksHandlerMap.put(nodeAddress, requestDataHandler);
                 requestDataHandler.requestData(nodeAddress);
             } else {
                 log.warn("We have started already a requestDataHandshake to peer. nodeAddress=" + nodeAddress + "\n" +
                         "We start a cleanup timer if the handler has not closed by itself in between 2 minutes.");
 
                 UserThread.runAfter(() -> {
-                    if (handlerMap.containsKey(nodeAddress)) {
-                        DaoMonitorRequestHandler handler = handlerMap.get(nodeAddress);
+                    if (blocksHandlerMap.containsKey(nodeAddress)) {
+                        DaoMonitorBlockRequestHandler handler = blocksHandlerMap.get(nodeAddress);
                         handler.stop();
-                        handlerMap.remove(nodeAddress);
+                        blocksHandlerMap.remove(nodeAddress);
+                    }
+                }, CLEANUP_TIMER);
+            }
+        } else {
+            log.warn("We have stopped already. We ignore that requestData call.");
+        }
+    }
+
+    private void requestP2PDataFromNode(NodeAddress nodeAddress) {
+        if (!stopped) {
+            if (!p2pDataHandlerMap.containsKey(nodeAddress)) {
+                final DaoMetrics p2PDataMetrics = daoMetricsModel.getP2PDataMetrics(nodeAddress);
+                DaoMonitorP2PDataRequestHandler requestDataHandler = new DaoMonitorP2PDataRequestHandler(networkNode,
+                        dataStorage,
+                        p2PDataMetrics,
+                        new DaoMonitorP2PDataRequestHandler.Listener() {
+                            @Override
+                            public void onComplete() {
+                                log.trace("RequestDataHandshake of outbound connection complete. nodeAddress={}",
+                                        nodeAddress);
+                                stopP2PDataRetryTimer(nodeAddress);
+                                p2pDataRetryCounterMap.remove(nodeAddress);
+                                p2PDataMetrics.setNumRequestAttempts(p2pDataRetryCounterMap.getOrDefault(nodeAddress, 1));
+
+                                // need to remove before listeners are notified as they cause the update call
+                                p2pDataHandlerMap.remove(nodeAddress);
+
+                                daoMetricsModel.updateReport();
+                                completedP2PDataRequestIndex++;
+                                if (completedP2PDataRequestIndex == numNodes)
+                                    daoMetricsModel.log();
+
+                                if (daoMetricsModel.getNodesInError().contains(nodeAddress)) {
+                                    daoMetricsModel.removeNodesInError(nodeAddress);
+                                }
+                            }
+
+                            @Override
+                            public void onFault(String errorMessage, NodeAddress nodeAddress) {
+                                p2pDataHandlerMap.remove(nodeAddress);
+                                stopP2PDataRetryTimer(nodeAddress);
+
+                                int retryCounter = p2pDataRetryCounterMap.getOrDefault(nodeAddress, 0);
+                                p2PDataMetrics.setNumRequestAttempts(retryCounter);
+                                if (retryCounter < MAX_RETRIES) {
+                                    log.info("We got an error at peer={}. We will try again after a delay of {} sec. error={} ",
+                                            nodeAddress, RETRY_DELAY_SEC, errorMessage);
+                                    final Timer timer = UserThread.runAfter(() -> requestFromNode(nodeAddress), RETRY_DELAY_SEC);
+                                    p2pDataRetryTimerMap.put(nodeAddress, timer);
+                                    p2pDataRetryCounterMap.put(nodeAddress, ++retryCounter);
+                                } else {
+                                    log.warn("We got repeated errors at peer={}. error={} ",
+                                            nodeAddress, errorMessage);
+
+                                    daoMetricsModel.addNodesInError(nodeAddress);
+                                    p2PDataMetrics.getErrorMessages().add(errorMessage + " (" + new Date().toString() + ")");
+
+                                    daoMetricsModel.updateReport();
+                                    completedP2PDataRequestIndex++;
+                                    if (completedP2PDataRequestIndex == numNodes)
+                                        daoMetricsModel.log();
+
+                                    p2pDataRetryCounterMap.remove(nodeAddress);
+                                }
+                            }
+                        });
+                p2pDataHandlerMap.put(nodeAddress, requestDataHandler);
+                requestDataHandler.requestData(nodeAddress);
+            } else {
+                log.warn("We have started already a requestDataHandshake to peer. nodeAddress=" + nodeAddress + "\n" +
+                        "We start a cleanup timer if the handler has not closed by itself in between 2 minutes.");
+
+                UserThread.runAfter(() -> {
+                    if (p2pDataHandlerMap.containsKey(nodeAddress)) {
+                        DaoMonitorP2PDataRequestHandler handler = p2pDataHandlerMap.get(nodeAddress);
+                        handler.stop();
+                        p2pDataHandlerMap.remove(nodeAddress);
                     }
                 }, CLEANUP_TIMER);
             }
@@ -247,39 +357,58 @@ public class DaoMonitorRequestManager implements ConnectionListener {
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     private void closeAllConnections() {
-        networkNode.getAllConnections().stream().forEach(connection -> connection.shutDown(CloseConnectionReason.CLOSE_REQUESTED_BY_PEER));
+        networkNode.getAllConnections().forEach(connection -> connection.shutDown(CloseConnectionReason.CLOSE_REQUESTED_BY_PEER));
     }
 
     private void stopAllRetryTimers() {
-        retryTimerMap.values().stream().forEach(Timer::stop);
-        retryTimerMap.clear();
+        p2pDataRetryTimerMap.values().forEach(Timer::stop);
+        p2pDataRetryTimerMap.clear();
 
-        retryCounterMap.clear();
+        p2pDataRetryCounterMap.clear();
+
+        blocksRetryTimerMap.values().forEach(Timer::stop);
+        blocksRetryTimerMap.clear();
+
+        blocksRetryCounterMap.clear();
     }
 
-    private void stopRetryTimer(NodeAddress nodeAddress) {
-        retryTimerMap.entrySet().stream()
+    private void closeAllHandlers() {
+        p2pDataHandlerMap.values().forEach(DaoMonitorP2PDataRequestHandler::cancel);
+        p2pDataHandlerMap.clear();
+
+        blocksHandlerMap.values().forEach(DaoMonitorBlockRequestHandler::cancel);
+        blocksHandlerMap.clear();
+    }
+
+    private void stopP2PDataRetryTimer(NodeAddress nodeAddress) {
+        p2pDataRetryTimerMap.entrySet().stream()
                 .filter(e -> e.getKey().equals(nodeAddress))
                 .forEach(e -> e.getValue().stop());
-        retryTimerMap.remove(nodeAddress);
+        p2pDataRetryTimerMap.remove(nodeAddress);
+    }
+
+    private void stopBlocksRetryTimer(NodeAddress nodeAddress) {
+        blocksRetryTimerMap.entrySet().stream()
+                .filter(e -> e.getKey().equals(nodeAddress))
+                .forEach(e -> e.getValue().stop());
+        blocksRetryTimerMap.remove(nodeAddress);
     }
 
     private void closeHandler(Connection connection) {
         Optional<NodeAddress> peersNodeAddressOptional = connection.getPeersNodeAddressOptional();
         if (peersNodeAddressOptional.isPresent()) {
             NodeAddress nodeAddress = peersNodeAddressOptional.get();
-            if (handlerMap.containsKey(nodeAddress)) {
-                handlerMap.get(nodeAddress).cancel();
-                handlerMap.remove(nodeAddress);
+            if (p2pDataHandlerMap.containsKey(nodeAddress)) {
+                p2pDataHandlerMap.get(nodeAddress).cancel();
+                p2pDataHandlerMap.remove(nodeAddress);
+            }
+
+            if (blocksHandlerMap.containsKey(nodeAddress)) {
+                blocksHandlerMap.get(nodeAddress).cancel();
+                blocksHandlerMap.remove(nodeAddress);
             }
         } else {
             log.trace("closeRequestDataHandler: nodeAddress not set in connection " + connection);
         }
     }
-
-    private void closeAllHandlers() {
-        handlerMap.values().stream().forEach(DaoMonitorRequestHandler::cancel);
-        handlerMap.clear();
-    }
-
 }
