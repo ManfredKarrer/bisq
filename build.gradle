@@ -343,6 +343,8 @@ configure(project(':monitor')) {
 }
 
 configure(project(':dao-monitor')) {
+    apply plugin: 'com.github.johnrengelman.shadow'
+
     mainClassName = 'bisq.daomonitor.MonitorMain'
 
     dependencies {
