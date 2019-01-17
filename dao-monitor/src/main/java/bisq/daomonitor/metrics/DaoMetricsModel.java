@@ -116,15 +116,14 @@ public class DaoMetricsModel {
         Map<NodeAddress, DaoMetrics> mergedMap = new HashMap<>();
         blocksMap.forEach((node, value) -> {
             DaoMetrics metrics = new DaoMetrics(p2pDataMap.get(node));
-            List<Map<String, Integer>> receivedObjectsList = value.getReceivedObjectsList();
-            List<Map<String, Integer>> receivedObjectsList1 = metrics.getReceivedObjectsList();
             mergedMap.put(node, metrics);
-            if (!receivedObjectsList1.isEmpty()) {
-                Map<String, Integer> objects = receivedObjectsList1.get(0);
-                receivedObjectsList.forEach(e1 -> {
+            List<Map<String, Integer>> fromBlockRequest = value.getReceivedObjectsList();
+            List<Map<String, Integer>> fromP2PRequest = metrics.getReceivedObjectsList();
+            fromP2PRequest.forEach(objects -> {
+                fromBlockRequest.forEach(e1 -> {
                     e1.forEach(objects::put);
                 });
-            }
+            });
         });
 
         List<Map.Entry<NodeAddress, DaoMetrics>> entryList = mergedMap.entrySet().stream()
