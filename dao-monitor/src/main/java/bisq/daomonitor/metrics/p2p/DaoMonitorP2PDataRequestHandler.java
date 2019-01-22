@@ -58,7 +58,7 @@ import org.jetbrains.annotations.NotNull;
 import bisq.daomonitor.metrics.DaoMetrics;
 
 @Slf4j
-class DaoMonitorRequestHandler implements MessageListener {
+class DaoMonitorP2PDataRequestHandler implements MessageListener {
     private static final long TIMEOUT = 120;
     private NodeAddress peersNodeAddress;
     private long requestTs;
@@ -93,7 +93,7 @@ class DaoMonitorRequestHandler implements MessageListener {
     // Constructor
     ///////////////////////////////////////////////////////////////////////////////////////////
 
-    public DaoMonitorRequestHandler(NetworkNode networkNode, P2PDataStorage dataStorage, DaoMetrics daoMetrics, Listener listener) {
+    public DaoMonitorP2PDataRequestHandler(NetworkNode networkNode, P2PDataStorage dataStorage, DaoMetrics daoMetrics, Listener listener) {
         this.networkNode = networkNode;
         this.dataStorage = dataStorage;
         this.daoMetrics = daoMetrics;
@@ -132,7 +132,7 @@ class DaoMonitorRequestHandler implements MessageListener {
                         if (!stopped) {
                             String errorMessage = "A timeout occurred at sending getDataRequest:" + getDataRequest +
                                     " on nodeAddress:" + nodeAddress;
-                            log.warn(errorMessage + " / RequestDataHandler=" + DaoMonitorRequestHandler.this);
+                            log.warn(errorMessage + " / RequestDataHandler=" + DaoMonitorP2PDataRequestHandler.this);
                             handleFault(errorMessage, nodeAddress, CloseConnectionReason.SEND_MSG_TIMEOUT);
                         } else {
                             log.trace("We have stopped already. We ignore that timeoutTimer.run call. " +
@@ -253,7 +253,8 @@ class DaoMonitorRequestHandler implements MessageListener {
                     daoMetrics.setLastDataResponseTs(System.currentTimeMillis());
 
                     cleanup();
-                    connection.shutDown(CloseConnectionReason.CLOSE_REQUESTED_BY_PEER, listener::onComplete);
+                    listener.onComplete();
+                    // connection.shutDown(CloseConnectionReason.CLOSE_REQUESTED_BY_PEER, listener::onComplete);
                 } else {
                     log.debug("Nonce not matching. That can happen rarely if we get a response after a canceled " +
                                     "handshake (timeout causes connection close but peer might have sent a msg before " +

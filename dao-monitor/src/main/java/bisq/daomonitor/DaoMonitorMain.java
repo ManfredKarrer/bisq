@@ -17,76 +17,74 @@
 
 package bisq.daomonitor;
 
-import bisq.core.app.BisqEnvironment;
 import bisq.core.app.BisqExecutable;
-import bisq.core.app.misc.ExecutableForAppWithP2p;
 
 import bisq.common.UserThread;
 import bisq.common.app.AppModule;
+import bisq.common.app.Version;
 import bisq.common.setup.CommonSetup;
 
-import joptsimple.OptionParser;
 import joptsimple.OptionSet;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 import lombok.extern.slf4j.Slf4j;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static spark.Spark.port;
-
-
-
-import spark.Spark;
-
 @Slf4j
-public class DaoMonitorMain extends ExecutableForAppWithP2p {
-    private static final String VERSION = "1.0.1";
-    private DaoMonitor daoMonitor;
+public class DaoMonitorMain extends BisqExecutable {
+    protected DaoMonitor daoMonitor;
 
     public DaoMonitorMain() {
-        super("Bisq DaoMonitor", "bisq-daoMonitor", VERSION);
+        super("Bisq Daemon", "bisqd", Version.VERSION);
     }
 
     public static void main(String[] args) throws Exception {
-        log.info("DaoMonitor.VERSION: " + VERSION);
-        BisqEnvironment.setDefaultAppName("bisq_monitor");
-        if (BisqExecutable.setupInitialOptionParser(args))
+        if (BisqExecutable.setupInitialOptionParser(args)) {
+            // For some reason the JavaFX launch process results in us losing the thread context class loader: reset it.
+            // In order to work around a bug in JavaFX 8u25 and below, you must include the following code as the first line of your realMain method:
+            Thread.currentThread().setContextClassLoader(DaoMonitorMain.class.getClassLoader());
+
             new DaoMonitorMain().execute(args);
+        }
     }
 
     @Override
     protected void doExecute(OptionSet options) {
         super.doExecute(options);
 
-        CommonSetup.setup(this);
-        checkMemory(bisqEnvironment, this);
-
-        startHttpServer(bisqEnvironment.getProperty(DaoMonitorOptionKeys.PORT));
-
         keepRunning();
     }
 
+
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    // First synchronous execution tasks
+    ///////////////////////////////////////////////////////////////////////////////////////////
+
     @Override
-    protected void setupEnvironment(OptionSet options) {
-        bisqEnvironment = new DaoMonitorEnvironment(checkNotNull(options));
+    protected void configUserThread() {
+        final ThreadFactory threadFactory = new ThreadFactoryBuilder()
+                .setNameFormat(this.getClass().getSimpleName())
+                .setDaemon(true)
+                .build();
+        UserThread.setExecutor(Executors.newSingleThreadExecutor(threadFactory));
     }
 
     @Override
     protected void launchApplication() {
-        UserThread.execute(() -> {
-            try {
-                daoMonitor = new DaoMonitor();
-                UserThread.execute(this::onApplicationLaunched);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        daoMonitor = new DaoMonitor();
+        CommonSetup.setup(DaoMonitorMain.this.daoMonitor);
+
+        UserThread.execute(this::onApplicationLaunched);
     }
 
     @Override
     protected void onApplicationLaunched() {
         super.onApplicationLaunched();
+        daoMonitor.setGracefulShutDownHandler(this);
     }
-
 
     ///////////////////////////////////////////////////////////////////////////////////////////
     // We continue with a series of synchronous execution tasks
@@ -94,7 +92,7 @@ public class DaoMonitorMain extends ExecutableForAppWithP2p {
 
     @Override
     protected AppModule getModule() {
-        return new DaoMonitorModule(bisqEnvironment);
+        return new DaoMonitorAppModule(bisqEnvironment);
     }
 
     @Override
@@ -106,37 +104,24 @@ public class DaoMonitorMain extends ExecutableForAppWithP2p {
 
     @Override
     protected void startApplication() {
+        // We need to be in user thread! We mapped at launchApplication already...
         daoMonitor.startApplication();
-    }
 
-    private void startHttpServer(String port) {
-        port(Integer.parseInt(port));
-        Spark.get("/", (req, res) -> {
-            log.info("Incoming request from: " + req.userAgent());
-            final String resultAsHtml = daoMonitor.getDaoMetricsModel().getResultAsHtml();
-            return resultAsHtml == null ? "Still starting up..." : resultAsHtml;
-        });
+        // In headless mode we don't have an async behaviour so we trigger the setup by calling onApplicationStarted
+        onApplicationStarted();
     }
 
     @Override
-    protected void customizeOptionParsing(OptionParser parser) {
-        super.customizeOptionParsing(parser);
+    public void onSetupComplete() {
 
-        parser.accepts(DaoMonitorOptionKeys.SLACK_URL_SEED_CHANNEL,
-                "Set slack secret for seed node daoMonitor")
-                .withRequiredArg();
+    }
 
-        parser.accepts(DaoMonitorOptionKeys.SLACK_BTC_SEED_CHANNEL,
-                "Set slack secret for Btc node daoMonitor")
-                .withRequiredArg();
-
-        parser.accepts(DaoMonitorOptionKeys.SLACK_PROVIDER_SEED_CHANNEL,
-                "Set slack secret for provider node daoMonitor")
-                .withRequiredArg();
-
-        parser.accepts(DaoMonitorOptionKeys.PORT,
-                "Set port to listen on")
-                .withRequiredArg()
-                .defaultsTo("80");
+    private void keepRunning() {
+        while (true) {
+            try {
+                Thread.sleep(Long.MAX_VALUE);
+            } catch (InterruptedException ignore) {
+            }
+        }
     }
 }
