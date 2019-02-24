@@ -65,22 +65,22 @@ class Keccak {
     private static final int LONGS_PER_BLOCK = BLOCK_SIZE / 8;
     private static final int KECCAK_ROUNDS = 24;
     private static final long[] KECCAKF_RNDC = {
-        0x0000000000000001L, 0x0000000000008082L, 0x800000000000808aL,
-        0x8000000080008000L, 0x000000000000808bL, 0x0000000080000001L,
-        0x8000000080008081L, 0x8000000000008009L, 0x000000000000008aL,
-        0x0000000000000088L, 0x0000000080008009L, 0x000000008000000aL,
-        0x000000008000808bL, 0x800000000000008bL, 0x8000000000008089L,
-        0x8000000000008003L, 0x8000000000008002L, 0x8000000000000080L,
-        0x000000000000800aL, 0x800000008000000aL, 0x8000000080008081L,
-        0x8000000000008080L, 0x0000000080000001L, 0x8000000080008008L
+            0x0000000000000001L, 0x0000000000008082L, 0x800000000000808aL,
+            0x8000000080008000L, 0x000000000000808bL, 0x0000000080000001L,
+            0x8000000080008081L, 0x8000000000008009L, 0x000000000000008aL,
+            0x0000000000000088L, 0x0000000080008009L, 0x000000008000000aL,
+            0x000000008000808bL, 0x800000000000008bL, 0x8000000000008089L,
+            0x8000000000008003L, 0x8000000000008002L, 0x8000000000000080L,
+            0x000000000000800aL, 0x800000008000000aL, 0x8000000080008081L,
+            0x8000000000008080L, 0x0000000080000001L, 0x8000000080008008L
     };
     private static final int[] KECCAKF_ROTC = {
-        1,  3,  6,  10, 15, 21, 28, 36, 45, 55, 2,  14,
-        27, 41, 56, 8,  25, 43, 62, 18, 39, 61, 20, 44
+            1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
+            27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44
     };
     private static final int[] KECCAKF_PILN = {
-        10, 7,  11, 17, 18, 3, 5,  16, 8,  21, 24, 4,
-        15, 23, 19, 13, 12, 2, 20, 14, 22, 9,  6,  1
+            10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
+            15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1
     };
 
     private static long rotateLeft(long value, int shift) {
@@ -137,9 +137,9 @@ class Keccak {
 
         ByteBuffer lastBlock = ByteBuffer.allocate(144).order(ByteOrder.LITTLE_ENDIAN);
         lastBlock.put(input);
-        lastBlock.put((byte)1);
+        lastBlock.put((byte) 1);
         int paddingOffset = BLOCK_SIZE - 1;
-        lastBlock.put(paddingOffset, (byte)(lastBlock.get(paddingOffset) | 0x80));
+        lastBlock.put(paddingOffset, (byte) (lastBlock.get(paddingOffset) | 0x80));
         lastBlock.rewind();
 
         for (int index = 0; index < LONGS_PER_BLOCK; ++index) {
@@ -161,14 +161,14 @@ class MoneroBase58 {
     private static final int FULL_DECODED_BLOCK_SIZE = 8;
     private static final int FULL_ENCODED_BLOCK_SIZE = 11;
     private static final BigInteger UINT64_MAX = new BigInteger("18446744073709551615");
-    private static final Map<Integer, Integer> DECODED_CHUNK_LENGTH = Map.of(   2,  1,
-                                                                                3,  2,
-                                                                                5,  3,
-                                                                                6,  4,
-                                                                                7,  5,
-                                                                                9,  6,
-                                                                                10, 7,
-                                                                                11, 8);
+    private static final Map<Integer, Integer> DECODED_CHUNK_LENGTH = Map.of(2, 1,
+            3, 2,
+            5, 3,
+            6, 4,
+            7, 5,
+            9, 6,
+            10, 7,
+            11, 8);
 
     private static void decodeChunk(String input,
                                     int inputOffset,
@@ -215,8 +215,8 @@ class MoneroBase58 {
         int inputOffset = 0;
         int resultOffset = 0;
         for (int chunk = 0; chunk < chunks; ++chunk,
-                                            inputOffset += FULL_ENCODED_BLOCK_SIZE,
-                                            resultOffset += FULL_DECODED_BLOCK_SIZE) {
+                inputOffset += FULL_ENCODED_BLOCK_SIZE,
+                resultOffset += FULL_DECODED_BLOCK_SIZE) {
             decodeChunk(input, inputOffset, FULL_ENCODED_BLOCK_SIZE, result, resultOffset, FULL_DECODED_BLOCK_SIZE);
         }
         if (lastChunkSize > 0) {

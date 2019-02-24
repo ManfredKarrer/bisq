@@ -33,36 +33,16 @@ package bisq.core.btc.setup;
 
 import org.bitcoinj.core.Block;
 import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.core.ProtocolException;
-import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.StoredBlock;
-import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
-import org.bitcoinj.store.ChainFileLockedException;
 import org.bitcoinj.store.SPVBlockStore;
-import org.bitcoinj.utils.Threading;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nullable;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * ClearableSPVBlockStore fixes some issues on SPVBlockStore that made
@@ -95,12 +75,14 @@ public class ClearableSPVBlockStore extends SPVBlockStore {
             buffer.position(0);
             long fileLength = randomAccessFile.length();
             for (int i = 0; i < fileLength; i++) {
-                buffer.put((byte)0);
+                buffer.put((byte) 0);
             }
             // Initialize store again
             buffer.position(0);
             initNewStoreCopy(params);
-        } finally { lock.unlock(); }
+        } finally {
+            lock.unlock();
+        }
     }
 
     // Copy of SPVBlockStore.initNewStore() that can not be used here because it is private

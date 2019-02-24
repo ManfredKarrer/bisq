@@ -508,7 +508,7 @@ public class ProposalDisplay {
                         comboBoxValueTextField.setText(confiscateBondComboBox.getConverter().toString(bond));
                         comboBoxValueTextField.setOnMouseClicked(e ->
                                 navigation.navigateToWithData(bond, MainView.class, DaoView.class, BondingView.class,
-                                BondsView.class));
+                                        BondsView.class));
                         comboBoxValueTextField.getStyleClass().addAll("hyperlink", "show-hand");
                     });
         } else if (proposal instanceof GenericProposal) {

@@ -23,7 +23,7 @@ import org.junit.Test;
 
 public class VectorspaceAITest extends AbstractAssetTest {
 
-    public VectorspaceAITest () {
+    public VectorspaceAITest() {
         super(new VectorspaceAI());
     }
 

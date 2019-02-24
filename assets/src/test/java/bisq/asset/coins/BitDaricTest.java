@@ -14,18 +14,24 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with Bisq. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package bisq.asset.coins;
+
 import bisq.asset.AbstractAssetTest;
+
 import org.junit.Test;
+
 public class BitDaricTest extends AbstractAssetTest {
     public BitDaricTest() {
         super(new BitDaric());
     }
+
     @Test
     public void testValidAddresses() {
         assertValidAddress("RKWuQUtmV3em1MyB7QKdshgDEAwKQXuifa");
         assertValidAddress("RG9YuDw7fa21a8h4E3Z2z2tgHrFNN27NnG");
     }
+
     @Test
     public void testInvalidAddresses() {
         assertInvalidAddress("17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem");
