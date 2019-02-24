@@ -76,7 +76,7 @@ public class DaoMonitor implements HeadlessApp {
 
             setupHandlers();
 
-            startHttpServer("8081");
+            startHttpServer("80");
 
             UserThread.runPeriodically(() -> Profiler.printSystemLoad(log), LOG_MEMORY_PERIOD_MIN, TimeUnit.MINUTES);
         } catch (Throwable throwable) {
