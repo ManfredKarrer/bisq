@@ -87,12 +87,9 @@ class DefaultSeedNodeAddresses {
             new NodeAddress("rxdkppp3vicnbgqt.onion:8002"),
             new NodeAddress("4ie52dse64kaarxw.onion:8002"),
 
-            // DAO TESTNET (server side regtest dedicated for DAO testing)
-            new NodeAddress("fjr5w4eckjghqtnu.onion:8003"), // testnet seed 1
-            new NodeAddress("74w2sttlo4qk6go3.onion:8003"), // testnet seed 2
-            new NodeAddress("jmc5ajqvtnzqaggm.onion:8003"), // testnet seed 3
-            new NodeAddress("3d56s6acbi3vk52v.onion:8003") //  testnet seed 4
-
+            // DAO REGTEST (server side regtest dedicated for DAO testing)
+            new NodeAddress("2bnvhfkdrnx5hrlv.onion:8005"), //
+            new NodeAddress("b3jnw7fyph2jsu6n.onion:8005") //
             // explorer
             // new NodeAddress("gtif46mfxirv533z.onion:8003")
     );
