@@ -418,7 +418,7 @@ public class BisqSetup {
 
     private void checkIfLocalHostNodeIsRunning() {
         // For DAO testnet we ignore local btc node
-        if (BisqEnvironment.getBaseCurrencyNetwork().isDaoTestNet()) {
+        if (BisqEnvironment.getBaseCurrencyNetwork().isDaoRegTest() || BisqEnvironment.getBaseCurrencyNetwork().isDaoTestNet()) {
             step3();
         } else {
             Thread checkIfLocalHostNodeIsRunningThread = new Thread(() -> {
@@ -464,7 +464,6 @@ public class BisqSetup {
         Thread checkCryptoThread = new Thread(() -> {
             try {
                 Thread.currentThread().setName("checkCryptoThread");
-                log.trace("Run crypto test");
                 // just use any simple dummy msg
                 Ping payload = new Ping(1, 1);
                 SealedAndSigned sealedAndSigned = EncryptionService.encryptHybridWithSignature(payload,

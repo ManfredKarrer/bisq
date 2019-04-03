@@ -126,14 +126,14 @@ public class ExportJsonFilesService implements DaoSetupService {
     }
 
     public void shutDown() {
-        if (dumpBlockchainData) {
+        if (dumpBlockchainData && txFileManager != null) {
             txFileManager.shutDown();
             txOutputFileManager.shutDown();
             bsqStateFileManager.shutDown();
         }
     }
 
-    public void exportToJson() {
+    public void maybeExportToJson() {
         if (dumpBlockchainData) {
             // We store the data we need once we write the data to disk (in the thread) locally.
             // Access to daoStateService is single threaded, we must not access daoStateService from the thread.
@@ -161,7 +161,6 @@ public class ExportJsonFilesService implements DaoSetupService {
 
             Futures.addCallback(future, new FutureCallback<>() {
                 public void onSuccess(Void ignore) {
-                    log.trace("onSuccess");
                 }
 
                 public void onFailure(@NotNull Throwable throwable) {
@@ -194,7 +193,8 @@ public class ExportJsonFilesService implements DaoSetupService {
                 getJsonTxOutputs(tx),
                 jsonTxType,
                 jsonTxTypeDisplayString,
-                daoStateService.getBurntFee(tx.getId()),
+                tx.getBurntFee(),
+                tx.getInvalidatedBsq(),
                 tx.getUnlockBlockHeight());
     }
 
@@ -240,7 +240,8 @@ public class ExportJsonFilesService implements DaoSetupService {
                             btcAmount,
                             tx.getBlockHeight(),
                             isBsqTxOutputType,
-                            daoStateService.getBurntFee(tx.getId()),
+                            tx.getBurntFee(),
+                            tx.getInvalidatedBsq(),
                             txOutput.getAddress(),
                             scriptPubKey,
                             spentInfo,

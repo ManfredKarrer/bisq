@@ -54,11 +54,16 @@ public class BitcoinModule extends AppModule {
 
     @Override
     protected void configure() {
-        // We we have selected BTC_DAO_TESTNET we use our master regtest node, otherwise the specified host or default
-        // (localhost)
-        String regTestHost = BisqEnvironment.getBaseCurrencyNetwork().isDaoTestNet() ?
-                "104.248.31.39" :
-                environment.getProperty(BtcOptionKeys.REG_TEST_HOST, String.class, RegTestHost.DEFAULT_HOST);
+        // If we we have selected BTC_DAO_REGTEST or BTC_DAO_TESTNET we use our master regtest node,
+        // otherwise the specified host or default (localhost)
+        String regTestHost = environment.getProperty(BtcOptionKeys.REG_TEST_HOST, String.class, "");
+        if (regTestHost.isEmpty()) {
+            regTestHost = BisqEnvironment.getBaseCurrencyNetwork().isDaoTestNet() ?
+                    "104.248.31.39" :
+                    BisqEnvironment.getBaseCurrencyNetwork().isDaoRegTest() ?
+                            "134.209.242.206" :
+                            RegTestHost.DEFAULT_HOST;
+        }
 
         RegTestHost.HOST = regTestHost;
         if (Arrays.asList("localhost", "127.0.0.1").contains(regTestHost)) {

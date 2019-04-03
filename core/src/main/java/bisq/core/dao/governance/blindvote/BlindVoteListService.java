@@ -79,7 +79,7 @@ public class BlindVoteListService implements AppendOnlyDataStoreListener, DaoSta
 
     @Override
     public void addListeners() {
-        daoStateService.addBsqStateListener(this);
+        daoStateService.addDaoStateListener(this);
         p2PService.getP2PDataStorage().addAppendOnlyDataStoreListener(this);
     }
 
@@ -105,7 +105,7 @@ public class BlindVoteListService implements AppendOnlyDataStoreListener, DaoSta
 
     @Override
     public void onAdded(PersistableNetworkPayload payload) {
-        onAppendOnlyDataAdded(payload);
+        onAppendOnlyDataAdded(payload, true);
     }
 
 
@@ -120,27 +120,36 @@ public class BlindVoteListService implements AppendOnlyDataStoreListener, DaoSta
                 .collect(Collectors.toList());
     }
 
+    public List<BlindVote> getConfirmedBlindVotes() {
+        return blindVotePayloads.stream()
+                .filter(blindVotePayload -> blindVoteValidator.areDataFieldsValidAndTxConfirmed(blindVotePayload.getBlindVote()))
+                .map(BlindVotePayload::getBlindVote)
+                .collect(Collectors.toList());
+    }
+
 
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Private
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     private void fillListFromAppendOnlyDataStore() {
-        p2PService.getP2PDataStorage().getAppendOnlyDataStoreMap().values().forEach(this::onAppendOnlyDataAdded);
+        p2PService.getP2PDataStorage().getAppendOnlyDataStoreMap().values().forEach(e -> onAppendOnlyDataAdded(e, false));
     }
 
-    private void onAppendOnlyDataAdded(PersistableNetworkPayload persistableNetworkPayload) {
+    private void onAppendOnlyDataAdded(PersistableNetworkPayload persistableNetworkPayload, boolean fromBroadcastMessage) {
         if (persistableNetworkPayload instanceof BlindVotePayload) {
             BlindVotePayload blindVotePayload = (BlindVotePayload) persistableNetworkPayload;
             if (!blindVotePayloads.contains(blindVotePayload)) {
                 BlindVote blindVote = blindVotePayload.getBlindVote();
                 String txId = blindVote.getTxId();
-                // We don't check the phase and the cycle as we want to add all object independently when we receive it
-                // (or when we start the app to fill our list from the data we gor from the seed node).
+                // We don't validate as we might receive blindVotes from other cycles or phases at startup.
+                // Beside that we might receive payloads we requested at the vote result phase in case we missed some
+                // payloads. We prefer here resilience over protection against late publishing attacks.
                 if (blindVoteValidator.areDataFieldsValid(blindVote)) {
-                    // We don't validate as we might receive blindVotes from other cycles or phases at startup.
+                    if (fromBroadcastMessage) {
+                        log.info("We received a blindVotePayload. blindVoteTxId={}", txId);
+                    }
                     blindVotePayloads.add(blindVotePayload);
-                    log.info("We received a blindVotePayload. blindVoteTxId={}", txId);
                 } else {
                     log.warn("We received an invalid blindVotePayload. blindVoteTxId={}", txId);
                 }

@@ -33,7 +33,7 @@ configure(subprojects) {
         jmockitVersion = '1.42'
         joptVersion = '5.0.3'
         langVersion = '3.4'
-        bitcoinjVersion = 'cd30ad5b'
+        bitcoinjVersion = '00298b1'
         logbackVersion = '1.1.10'
         lombokVersion = '1.18.2'
         mockitoVersion = '2.21.0'
@@ -134,8 +134,13 @@ configure([project(':desktop'),
 configure(project(':assets')) {
     dependencies {
         compile("com.github.bisq-network.bitcoinj:bitcoinj-core:$bitcoinjVersion") {
+            exclude(module: 'jsr305')
+            exclude(module: 'slf4j-api')
+            exclude(module: 'guava')
             exclude(module: 'protobuf-java')
         }
+        compile 'com.google.guava:guava:20.0'
+        compile "org.slf4j:slf4j-api:$slf4jVersion"
         compile "commons-codec:commons-codec:$codecVersion"
         compile "org.apache.commons:commons-lang3:$langVersion"
         compile "org.bouncycastle:bcpg-jdk15on:$bcVersion"
@@ -191,10 +196,10 @@ configure(project(':common')) {
 configure(project(':p2p')) {
     dependencies {
         compile project(':common')
-        compile('com.github.JesusMcCloud.netlayer:tor.native:0.6.3') {
+        compile('com.github.JesusMcCloud.netlayer:tor.native:0.6.5') {
             exclude(module: 'slf4j-api')
         }
-        compile('com.github.JesusMcCloud.netlayer:tor.external:0.6.3') {
+        compile('com.github.JesusMcCloud.netlayer:tor.external:0.6.5') {
             exclude(module: 'slf4j-api')
         }
         compile('org.apache.httpcomponents:httpclient:4.5.3') {
@@ -268,7 +273,7 @@ configure(project(':desktop')) {
     apply plugin: 'witness'
     apply from: '../gradle/witness/gradle-witness.gradle'
 
-    version = '0.9.4-SNAPSHOT'
+    version = '0.9.7-SNAPSHOT'
 
     mainClassName = 'bisq.desktop.app.BisqAppMain'
 
@@ -324,7 +329,6 @@ configure(project(':monitor')) {
     mainClassName = 'bisq.monitor.MonitorMain'
 
     dependencies {
-        compile project(':p2p')
         compile project(':core')
         compile "org.slf4j:slf4j-api:$slf4jVersion"
         compile "ch.qos.logback:logback-core:$logbackVersion"
