@@ -33,7 +33,6 @@ import bisq.network.p2p.storage.payload.ProtectedStoragePayload;
 import bisq.common.Timer;
 import bisq.common.UserThread;
 import bisq.common.app.DevEnv;
-import bisq.common.app.Log;
 import bisq.common.proto.network.NetworkEnvelope;
 import bisq.common.proto.network.NetworkPayload;
 
@@ -110,7 +109,6 @@ class DaoMonitorP2PDataRequestHandler implements MessageListener {
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     public void requestData(NodeAddress nodeAddress) {
-        Log.traceCall("nodeAddress=" + nodeAddress);
         peersNodeAddress = nodeAddress;
         requestTs = new Date().getTime();
         if (!stopped) {
@@ -185,7 +183,6 @@ class DaoMonitorP2PDataRequestHandler implements MessageListener {
         if (networkEnvelop instanceof GetDataResponse &&
                 connection.getPeersNodeAddressOptional().isPresent() &&
                 connection.getPeersNodeAddressOptional().get().equals(peersNodeAddress)) {
-            Log.traceCall(networkEnvelop.toString() + "\n\tconnection=" + connection);
             if (!stopped) {
                 GetDataResponse getDataResponse = (GetDataResponse) networkEnvelop;
                 if (getDataResponse.getRequestNonce() == nonce) {
@@ -288,7 +285,6 @@ class DaoMonitorP2PDataRequestHandler implements MessageListener {
     }
 
     private void cleanup() {
-        Log.traceCall();
         stopped = true;
         networkNode.removeMessageListener(this);
         stopTimeoutTimer();

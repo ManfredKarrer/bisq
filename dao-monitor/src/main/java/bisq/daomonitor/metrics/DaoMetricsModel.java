@@ -41,7 +41,6 @@ import java.net.InetAddress;
 
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -127,7 +126,6 @@ public class DaoMetricsModel {
         });
 
         List<Map.Entry<NodeAddress, DaoMetrics>> entryList = mergedMap.entrySet().stream()
-                .sorted(Comparator.comparing(entrySet -> seedNodeRepository.getOperator(entrySet.getKey())))
                 .collect(Collectors.toList());
 
         totalErrors = 0;
@@ -194,7 +192,7 @@ public class DaoMetricsModel {
             if (averageOptional.isPresent())
                 durationAverage = averageOptional.getAsDouble() / 1000;
             final NodeAddress nodeAddress = e.getKey();
-            final String operator = seedNodeRepository.getOperator(nodeAddress);
+            final String operator = "N/A";
             final List<String> errorMessages = daoMetrics.getErrorMessages();
             final int numErrors = (int) errorMessages.stream().filter(s -> !s.isEmpty()).count();
             int numRequests = allDurations.size();

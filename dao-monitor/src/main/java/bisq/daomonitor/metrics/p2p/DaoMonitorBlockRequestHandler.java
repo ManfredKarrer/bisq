@@ -30,7 +30,6 @@ import bisq.network.p2p.network.NetworkNode;
 import bisq.common.Timer;
 import bisq.common.UserThread;
 import bisq.common.app.DevEnv;
-import bisq.common.app.Log;
 import bisq.common.proto.network.NetworkEnvelope;
 
 import com.google.common.util.concurrent.FutureCallback;
@@ -101,7 +100,6 @@ class DaoMonitorBlockRequestHandler implements MessageListener {
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     public void requestData(NodeAddress nodeAddress) {
-        Log.traceCall("nodeAddress=" + nodeAddress);
         peersNodeAddress = nodeAddress;
         requestTs = new Date().getTime();
         if (!stopped) {
@@ -173,7 +171,6 @@ class DaoMonitorBlockRequestHandler implements MessageListener {
         if (networkEnvelop instanceof GetBlocksResponse &&
                 connection.getPeersNodeAddressOptional().isPresent() &&
                 connection.getPeersNodeAddressOptional().get().equals(peersNodeAddress)) {
-            Log.traceCall(networkEnvelop.toString() + "\n\tconnection=" + connection);
             if (!stopped) {
                 GetBlocksResponse getBlocksResponse = (GetBlocksResponse) networkEnvelop;
                 if (getBlocksResponse.getRequestNonce() == nonce) {
@@ -235,7 +232,6 @@ class DaoMonitorBlockRequestHandler implements MessageListener {
     }
 
     private void cleanup() {
-        Log.traceCall();
         stopped = true;
         networkNode.removeMessageListener(this);
         stopTimeoutTimer();
