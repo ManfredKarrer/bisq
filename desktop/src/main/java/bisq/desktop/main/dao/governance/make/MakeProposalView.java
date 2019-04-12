@@ -35,6 +35,7 @@ import bisq.core.btc.wallet.BsqWalletService;
 import bisq.core.dao.DaoFacade;
 import bisq.core.dao.governance.bond.Bond;
 import bisq.core.dao.governance.param.Param;
+import bisq.core.dao.governance.proposal.IssuanceProposal;
 import bisq.core.dao.governance.proposal.ProposalType;
 import bisq.core.dao.governance.proposal.ProposalValidationException;
 import bisq.core.dao.governance.proposal.ProposalWithTransaction;
@@ -309,8 +310,14 @@ public class MakeProposalView extends ActivatableView<GridPane, Void> implements
                 new Popup<>().warning(Res.get("dao.proposal.create.missingBsqFunds",
                         bsqFormatter.formatCoinWithCode(e.missing))).show();
             } else {
-                new Popup<>().warning(Res.get("dao.proposal.create.missingMinerFeeFunds",
-                        btcFormatter.formatCoinWithCode(e.missing))).show();
+                if (type.equals(ProposalType.COMPENSATION_REQUEST) || type.equals(ProposalType.REIMBURSEMENT_REQUEST)) {
+                    new Popup<>().warning(Res.get("dao.proposal.create.missingIssuanceFunds",
+                            100,
+                            btcFormatter.formatCoinWithCode(e.missing))).show();
+                } else {
+                    new Popup<>().warning(Res.get("dao.proposal.create.missingMinerFeeFunds",
+                            btcFormatter.formatCoinWithCode(e.missing))).show();
+                }
             }
         } catch (ProposalValidationException e) {
             String message;
@@ -334,7 +341,11 @@ public class MakeProposalView extends ActivatableView<GridPane, Void> implements
 
     private void showFeeInfoAndPublishMyProposal(Proposal proposal, Transaction transaction, Coin miningFee, int txSize, Coin fee) {
         if (!DevEnv.isDevMode()) {
-            GUIUtil.showBsqFeeInfoPopup(fee, miningFee, txSize, bsqFormatter, btcFormatter,
+            Coin btcForIssuance = null;
+
+            if (proposal instanceof IssuanceProposal) btcForIssuance = ((IssuanceProposal) proposal).getRequestedBsq();
+
+            GUIUtil.showBsqFeeInfoPopup(fee, miningFee, btcForIssuance, txSize, bsqFormatter, btcFormatter,
                     Res.get("dao.proposal"), () -> doPublishMyProposal(proposal, transaction));
         } else {
             doPublishMyProposal(proposal, transaction);
@@ -342,9 +353,11 @@ public class MakeProposalView extends ActivatableView<GridPane, Void> implements
     }
 
     private void doPublishMyProposal(Proposal proposal, Transaction transaction) {
+        //TODO it still happens that the user can click twice. Not clear why that can happen. Maybe we get updateButtonState
+        // called in between which re-enables the button?
+        makeProposalButton.setDisable(true);
         busyLabel.setVisible(true);
         busyAnimation.play();
-        makeProposalButton.setDisable(true);
 
         daoFacade.publishMyProposal(proposal,
                 transaction,

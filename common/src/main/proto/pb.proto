@@ -528,6 +528,7 @@ message Filter {
     bool prevent_public_btc_network = 12;
     repeated string btc_nodes = 13;
     bool disable_dao = 14;
+    string disable_dao_below_version = 15;
 }
 
 // not used anymore from v0.6 on. But leave it for receiving TradeStatistics objects from older
@@ -1711,7 +1712,8 @@ message BlindVote {
     string tx_id = 2;
     int64 stake = 3;
     bytes encrypted_merit_list = 4;
-    map<string, string> extra_data = 5;
+    int64 date = 5;
+    map<string, string> extra_data = 6;
 }
 
 message MyBlindVoteList {
@@ -1724,8 +1726,7 @@ message BlindVoteStore {
 
 message BlindVotePayload {
     BlindVote blind_vote = 1;
-    int64 date = 2;
-    bytes hash = 3;
+    bytes hash = 2;
 }
 
 message Vote {
