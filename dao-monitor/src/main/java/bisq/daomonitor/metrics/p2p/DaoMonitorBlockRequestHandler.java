@@ -104,7 +104,7 @@ class DaoMonitorBlockRequestHandler implements MessageListener {
         requestTs = new Date().getTime();
         if (!stopped) {
 
-            GetBlocksRequest getBlocksRequest = new GetBlocksRequest(0, nonce);
+            GetBlocksRequest getBlocksRequest = new GetBlocksRequest(0, nonce, networkNode.getNodeAddress());
             daoMetrics.setLastDataRequestTs(System.currentTimeMillis());
 
             if (timeoutTimer != null) {
