@@ -333,6 +333,7 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
                 .show());
         bisqSetup.setDisplayAlertHandler(alert -> new DisplayAlertMessageWindow()
                 .alertMessage(alert)
+                .closeButtonText(Res.get("shared.close"))
                 .onClose(() -> {
                     user.setDisplayedAlert(alert);
                 })
@@ -377,6 +378,9 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
         bisqSetup.getBtcSyncProgress().addListener((observable, oldValue, newValue) -> updateBtcSyncProgress());
         daoPresentation.getBsqSyncProgress().addListener((observable, oldValue, newValue) -> updateBtcSyncProgress());
 
+        bisqSetup.setFilterWarningHandler(warning -> {
+            new Popup<>().warning(warning).show();
+        });
     }
 
     private void setupP2PNumPeersWatcher() {

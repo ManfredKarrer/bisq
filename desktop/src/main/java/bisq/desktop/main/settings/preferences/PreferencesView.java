@@ -30,7 +30,10 @@ import bisq.desktop.util.ImageUtil;
 import bisq.desktop.util.Layout;
 
 import bisq.core.app.BisqEnvironment;
+import bisq.core.btc.BaseCurrencyNetwork;
+import bisq.core.btc.wallet.Restrictions;
 import bisq.core.dao.DaoFacade;
+import bisq.core.dao.DaoOptionKeys;
 import bisq.core.dao.governance.asset.AssetService;
 import bisq.core.filter.FilterManager;
 import bisq.core.locale.Country;
@@ -42,10 +45,10 @@ import bisq.core.locale.LanguageUtil;
 import bisq.core.locale.Res;
 import bisq.core.locale.TradeCurrency;
 import bisq.core.provider.fee.FeeService;
-import bisq.core.trade.statistics.ReferralIdService;
 import bisq.core.user.BlockChainExplorer;
 import bisq.core.user.Preferences;
 import bisq.core.util.BSFormatter;
+import bisq.core.util.validation.IntegerValidator;
 
 import bisq.common.UserThread;
 import bisq.common.app.DevEnv;
@@ -54,6 +57,7 @@ import bisq.common.util.Tuple3;
 import org.bitcoinj.core.Coin;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -88,6 +92,7 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import static bisq.desktop.util.FormBuilder.*;
+import static com.google.common.base.Preconditions.checkArgument;
 
 @FxmlView
 public class PreferencesView extends ActivatableViewAndModel<GridPane, PreferencesViewModel> {
@@ -103,7 +108,9 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
     private ToggleButton showOwnOffersInOfferBook, useAnimations, sortMarketCurrenciesNumerically, avoidStandbyMode,
             useCustomFee;
     private int gridRow = 0;
-    private InputTextField transactionFeeInputTextField, ignoreTradersListInputTextField, referralIdInputTextField, rpcUserTextField;
+    private InputTextField transactionFeeInputTextField, ignoreTradersListInputTextField, ignoreDustThresholdInputTextField,
+    /*referralIdInputTextField,*/
+    rpcUserTextField, blockNotifyPortTextField;
     private ToggleButton isDaoFullNodeToggleButton;
     private PasswordTextField rpcPwTextField;
     private TitledGroupBg daoOptionsTitledGroupBg;
@@ -111,7 +118,7 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
     private ChangeListener<Boolean> transactionFeeFocusedListener;
     private final Preferences preferences;
     private final FeeService feeService;
-    private final ReferralIdService referralIdService;
+    //private final ReferralIdService referralIdService;
     private final AssetService assetService;
     private final FilterManager filterManager;
     private final DaoFacade daoFacade;
@@ -132,10 +139,12 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
     private ObservableList<CryptoCurrency> allCryptoCurrencies;
     private ObservableList<TradeCurrency> tradeCurrencies;
     private InputTextField deviationInputTextField;
-    private ChangeListener<String> deviationListener, ignoreTradersListListener, referralIdListener, rpcUserListener, rpcPwListener;
+    private ChangeListener<String> deviationListener, ignoreTradersListListener, ignoreDustThresholdListener,
+    /*referralIdListener,*/ rpcUserListener, rpcPwListener, blockNotifyPortListener;
     private ChangeListener<Boolean> deviationFocusedListener;
     private ChangeListener<Boolean> useCustomFeeCheckboxListener;
     private ChangeListener<Number> transactionFeeChangeListener;
+    private final boolean daoOptionsSet;
 
 
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -143,22 +152,32 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     @Inject
-    public PreferencesView(PreferencesViewModel model, Preferences preferences, FeeService feeService,
-                           ReferralIdService referralIdService, AssetService assetService,
-                           FilterManager filterManager, DaoFacade daoFacade, BSFormatter formatter) {
+    public PreferencesView(PreferencesViewModel model,
+                           Preferences preferences,
+                           FeeService feeService,
+                           AssetService assetService,
+                           FilterManager filterManager,
+                           DaoFacade daoFacade,
+                           BSFormatter formatter,
+                           @Named(DaoOptionKeys.FULL_DAO_NODE) String fullDaoNode,
+                           @Named(DaoOptionKeys.RPC_USER) String rpcUser,
+                           @Named(DaoOptionKeys.RPC_PASSWORD) String rpcPassword,
+                           @Named(DaoOptionKeys.RPC_BLOCK_NOTIFICATION_PORT) String rpcBlockNotificationPort) {
         super(model);
         this.preferences = preferences;
         this.feeService = feeService;
-        this.referralIdService = referralIdService;
         this.assetService = assetService;
         this.filterManager = filterManager;
         this.daoFacade = daoFacade;
         this.formatter = formatter;
+        daoOptionsSet = fullDaoNode != null && !fullDaoNode.isEmpty() &&
+                rpcUser != null && !rpcUser.isEmpty() &&
+                rpcPassword != null && !rpcPassword.isEmpty() &&
+                rpcBlockNotificationPort != null && !rpcBlockNotificationPort.isEmpty();
     }
 
     @Override
     public void initialize() {
-
         blockExplorers = FXCollections.observableArrayList(preferences.getBlockChainExplorers());
         languageCodes = FXCollections.observableArrayList(LanguageUtil.getUserLanguageCodes());
         countries = FXCollections.observableArrayList(CountryUtil.getAllCountries());
@@ -175,6 +194,7 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
         initializeDisplayOptions();
         if (DevEnv.isDaoActivated())
             initializeDaoOptions();
+
     }
 
 
@@ -320,10 +340,31 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
                 preferences.setIgnoreTradersList(Arrays.asList(StringUtils.deleteWhitespace(newValue).split(",")));
 
         // referralId
-        referralIdInputTextField = addInputTextField(root, ++gridRow, Res.get("setting.preferences.refererId"));
+       /* referralIdInputTextField = addInputTextField(root, ++gridRow, Res.get("setting.preferences.refererId"));
         referralIdListener = (observable, oldValue, newValue) -> {
             if (!newValue.equals(oldValue))
                 referralIdService.setReferralId(newValue);
+        };*/
+
+
+        // ignoreDustThreshold
+        ignoreDustThresholdInputTextField = addInputTextField(root, ++gridRow, Res.get("setting.preferences.ignoreDustThreshold"));
+        IntegerValidator validator = new IntegerValidator();
+        validator.setMinValue((int) Restrictions.getMinNonDustOutput().value);
+        validator.setMaxValue(2000);
+        ignoreDustThresholdInputTextField.setValidator(validator);
+        ignoreDustThresholdListener = (observable, oldValue, newValue) -> {
+            try {
+                int value = Integer.parseInt(newValue);
+                checkArgument(value >= Restrictions.getMinNonDustOutput().value,
+                        "Input must be at least " + Restrictions.getMinNonDustOutput().value);
+                checkArgument(value <= 2000,
+                        "Input must not be higher than 2000 Satoshis");
+                if (!newValue.equals(oldValue)) {
+                    preferences.setIgnoreDustThreshold(value);
+                }
+            } catch (Throwable ignore) {
+            }
         };
 
         // AvoidStandbyModeService
@@ -568,15 +609,31 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
         GridPane.setHgrow(resyncDaoButton, Priority.ALWAYS);
 
         isDaoFullNodeToggleButton = addSlideToggleButton(root, ++gridRow, Res.get("setting.preferences.dao.isDaoFullNode"));
-        rpcUserTextField = addInputTextField(root, ++gridRow, Res.getWithCol("setting.preferences.dao.rpcUser"));
+        rpcUserTextField = addInputTextField(root, ++gridRow, Res.get("setting.preferences.dao.rpcUser"));
         rpcUserTextField.setVisible(false);
         rpcUserTextField.setManaged(false);
-        rpcPwTextField = addPasswordTextField(root, ++gridRow, Res.getWithCol("setting.preferences.dao.rpcPw"));
+        rpcPwTextField = addPasswordTextField(root, ++gridRow, Res.get("setting.preferences.dao.rpcPw"));
         rpcPwTextField.setVisible(false);
         rpcPwTextField.setManaged(false);
 
+        // @Christoph: addPasswordTextField has by default column span 2. Would be better to dont set it there...
+        GridPane.setColumnSpan(rpcPwTextField, 1);
+        GridPane.setMargin(rpcPwTextField, new Insets(20, 0, 0, 0));
+
+        blockNotifyPortTextField = addInputTextField(root, ++gridRow, Res.get("setting.preferences.dao.blockNotifyPort"));
+        blockNotifyPortTextField.setVisible(false);
+        blockNotifyPortTextField.setManaged(false);
+
         rpcUserListener = (observable, oldValue, newValue) -> preferences.setRpcUser(rpcUserTextField.getText());
         rpcPwListener = (observable, oldValue, newValue) -> preferences.setRpcPw(rpcPwTextField.getText());
+        blockNotifyPortListener = (observable, oldValue, newValue) -> {
+            try {
+                int port = Integer.parseInt(blockNotifyPortTextField.getText());
+                preferences.setBlockNotifyPort(port);
+            } catch (Throwable ignore) {
+                log.warn("Invalid input for blockNotifyPort: {}", blockNotifyPortTextField.getText());
+            }
+        };
     }
 
 
@@ -608,8 +665,9 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
 
         transactionFeeInputTextField.setText(String.valueOf(getTxFeeForWithdrawalPerByte()));
         ignoreTradersListInputTextField.setText(String.join(", ", preferences.getIgnoreTradersList()));
-        referralIdService.getOptionalReferralId().ifPresent(referralId -> referralIdInputTextField.setText(referralId));
-        referralIdInputTextField.setPromptText(Res.get("setting.preferences.refererId.prompt"));
+        /* referralIdService.getOptionalReferralId().ifPresent(referralId -> referralIdInputTextField.setText(referralId));
+        referralIdInputTextField.setPromptText(Res.get("setting.preferences.refererId.prompt"));*/
+        ignoreDustThresholdInputTextField.setText(String.valueOf(preferences.getIgnoreDustThreshold()));
         userLanguageComboBox.setItems(languageCodes);
         userLanguageComboBox.getSelectionModel().select(preferences.getUserLanguage());
         userLanguageComboBox.setConverter(new StringConverter<>() {
@@ -694,7 +752,8 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
         transactionFeeInputTextField.focusedProperty().addListener(transactionFeeFocusedListener);
         ignoreTradersListInputTextField.textProperty().addListener(ignoreTradersListListener);
         useCustomFee.selectedProperty().addListener(useCustomFeeCheckboxListener);
-        referralIdInputTextField.textProperty().addListener(referralIdListener);
+        //referralIdInputTextField.textProperty().addListener(referralIdListener);
+        ignoreDustThresholdInputTextField.textProperty().addListener(ignoreDustThresholdListener);
     }
 
     private Coin getTxFeeForWithdrawalPerByte() {
@@ -773,12 +832,17 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
         isDaoFullNodeToggleButton.setSelected(daoFullNode);
         String rpcUser = preferences.getRpcUser();
         String rpcPw = preferences.getRpcPw();
-        if (daoFullNode && (rpcUser == null || rpcUser.isEmpty() || rpcPw == null || rpcPw.isEmpty())) {
-            log.warn("You have full DAO node selected but have not provided the rpc username and password. We reset daoFullNode to false");
+        int blockNotifyPort = preferences.getBlockNotifyPort();
+        if (daoFullNode && (rpcUser == null || rpcUser.isEmpty() ||
+                rpcPw == null || rpcPw.isEmpty()) ||
+                blockNotifyPort <= 0) {
+            log.warn("You have full DAO node selected but have not provided the rpc username, password and " +
+                    "block notify port. We reset daoFullNode to false");
             isDaoFullNodeToggleButton.setSelected(false);
         }
         rpcUserTextField.setText(rpcUser);
         rpcPwTextField.setText(rpcPw);
+        blockNotifyPortTextField.setText(blockNotifyPort > 0 ? String.valueOf(blockNotifyPort) : "");
         updateDaoFields();
 
         resyncDaoButton.setOnAction(e -> daoFacade.resyncDao(() ->
@@ -809,20 +873,29 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
 
         rpcUserTextField.textProperty().addListener(rpcUserListener);
         rpcPwTextField.textProperty().addListener(rpcPwListener);
+        blockNotifyPortTextField.textProperty().addListener(blockNotifyPortListener);
     }
 
     private void updateDaoFields() {
         boolean isDaoFullNode = isDaoFullNodeToggleButton.isSelected();
-        GridPane.setRowSpan(daoOptionsTitledGroupBg, isDaoFullNode ? 4 : 2);
+        GridPane.setRowSpan(daoOptionsTitledGroupBg, isDaoFullNode ? 5 : 2);
         rpcUserTextField.setVisible(isDaoFullNode);
         rpcUserTextField.setManaged(isDaoFullNode);
         rpcPwTextField.setVisible(isDaoFullNode);
         rpcPwTextField.setManaged(isDaoFullNode);
+        blockNotifyPortTextField.setVisible(isDaoFullNode);
+        blockNotifyPortTextField.setManaged(isDaoFullNode);
         preferences.setDaoFullNode(isDaoFullNode);
         if (!isDaoFullNode) {
-            rpcPwTextField.clear();
             rpcUserTextField.clear();
+            rpcPwTextField.clear();
+            blockNotifyPortTextField.clear();
         }
+
+        isDaoFullNodeToggleButton.setDisable(daoOptionsSet);
+        rpcUserTextField.setDisable(daoOptionsSet);
+        rpcPwTextField.setDisable(daoOptionsSet);
+        blockNotifyPortTextField.setDisable(daoOptionsSet);
     }
 
    /* private void onSelectNetwork() {
@@ -858,7 +931,8 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
             feeService.feeUpdateCounterProperty().removeListener(transactionFeeChangeListener);
         ignoreTradersListInputTextField.textProperty().removeListener(ignoreTradersListListener);
         useCustomFee.selectedProperty().removeListener(useCustomFeeCheckboxListener);
-        referralIdInputTextField.textProperty().removeListener(referralIdListener);
+        //referralIdInputTextField.textProperty().removeListener(referralIdListener);
+        ignoreDustThresholdInputTextField.textProperty().removeListener(ignoreDustThresholdListener);
     }
 
     private void deactivateDisplayCurrencies() {
@@ -878,6 +952,7 @@ public class PreferencesView extends ActivatableViewAndModel<GridPane, Preferenc
         resyncDaoButton.setOnAction(null);
         isDaoFullNodeToggleButton.setOnAction(null);
         rpcUserTextField.textProperty().removeListener(rpcUserListener);
-        rpcPwTextField.textProperty().removeListener(rpcUserListener);
+        rpcPwTextField.textProperty().removeListener(rpcPwListener);
+        blockNotifyPortTextField.textProperty().removeListener(blockNotifyPortListener);
     }
 }
