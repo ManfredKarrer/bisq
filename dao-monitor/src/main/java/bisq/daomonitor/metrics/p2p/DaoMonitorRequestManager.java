@@ -194,8 +194,8 @@ public class DaoMonitorRequestManager implements ConnectionListener {
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     private void requestFromNode(NodeAddress nodeAddress) {
-        requestBlocksFromNode(nodeAddress);
         requestP2PDataFromNode(nodeAddress);
+        UserThread.runAfter(() -> requestBlocksFromNode(nodeAddress), 10);
     }
 
     private void requestBlocksFromNode(NodeAddress nodeAddress) {
