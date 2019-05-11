@@ -342,7 +342,7 @@ public class BisqEnvironment extends StandardEnvironment {
                 "Bisq";
         useAllProvidedNodes = commandLineProperties.containsProperty(BtcOptionKeys.USE_ALL_PROVIDED_NODES) ?
                 (String) commandLineProperties.getProperty(BtcOptionKeys.USE_ALL_PROVIDED_NODES) :
-                "false";
+                "true";
         numConnectionForBtc = commandLineProperties.containsProperty(BtcOptionKeys.NUM_CONNECTIONS_FOR_BTC) ?
                 (String) commandLineProperties.getProperty(BtcOptionKeys.NUM_CONNECTIONS_FOR_BTC) :
                 "50";

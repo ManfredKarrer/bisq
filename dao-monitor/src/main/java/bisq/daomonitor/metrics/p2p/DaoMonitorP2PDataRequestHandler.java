@@ -17,6 +17,9 @@
 
 package bisq.daomonitor.metrics.p2p;
 
+import bisq.core.payment.AccountAgeWitness;
+import bisq.core.trade.statistics.TradeStatistics2;
+
 import bisq.network.p2p.NodeAddress;
 import bisq.network.p2p.network.CloseConnectionReason;
 import bisq.network.p2p.network.Connection;
@@ -113,6 +116,7 @@ class DaoMonitorP2PDataRequestHandler implements MessageListener {
         requestTs = new Date().getTime();
         if (!stopped) {
             Set<byte[]> excludedKeys = dataStorage.getAppendOnlyDataStoreMap().entrySet().stream()
+                    .filter(e -> e.getValue() instanceof TradeStatistics2 || e.getValue() instanceof AccountAgeWitness)
                     .map(e -> e.getKey().bytes)
                     .collect(Collectors.toSet());
 

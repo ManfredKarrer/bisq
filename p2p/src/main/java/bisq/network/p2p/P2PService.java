@@ -97,7 +97,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class P2PService implements SetupListener, MessageListener, ConnectionListener, RequestDataManager.Listener,
         HashMapChangedListener, PersistedDataHost {
     private static final Logger log = LoggerFactory.getLogger(P2PService.class);
-    public static final int MAX_CONNECTIONS_DEFAULT = 12;
+    public static final int MAX_CONNECTIONS_DEFAULT = 30;
 
     private final SeedNodeRepository seedNodeRepository;
     private final EncryptionService encryptionService;
