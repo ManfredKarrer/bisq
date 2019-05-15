@@ -57,7 +57,8 @@ public final class SepaAccountPayload extends CountryBasedPaymentAccountPayload 
     private String iban = "";
     @Setter
     private String bic = "";
-    private String email = ""; // not used anymore but need to keep it for backward compatibility, must not be null but empty string, otherwise hash check fails for contract
+    @Setter
+    private String email = "";
 
     // Dont use a set here as we need a deterministic ordering, otherwise the contract hash does not match
     private final List<String> acceptedCountryCodes;
@@ -147,12 +148,17 @@ public final class SepaAccountPayload extends CountryBasedPaymentAccountPayload 
 
     @Override
     public String getPaymentDetails() {
-        return Res.get(paymentMethodId) + " - " + Res.getWithCol("payment.account.owner") + " " + holderName + ", IBAN: " + iban + ", BIC: " + bic + ", " + Res.getWithCol("payment.bank.country") + " " + getCountryCode();
+        return Res.get(paymentMethodId) + " - " + Res.getWithCol("payment.account.owner") + " " + holderName +
+                ", Email: " + email +
+                ", IBAN: " + iban +
+                ", BIC: " + bic +
+                ", " + Res.getWithCol("payment.bank.country") + " " + getCountryCode();
     }
 
     @Override
     public String getPaymentDetailsForTradePopup() {
         return Res.getWithCol("payment.account.owner") + " " + holderName + "\n" +
+                "Email: " + email + "\n" +
                 "IBAN: " + iban + "\n" +
                 "BIC: " + bic + "\n" +
                 Res.getWithCol("payment.bank.country") + " " + CountryUtil.getNameByCode(countryCode);

@@ -67,6 +67,15 @@ public final class SepaAccount extends CountryBasedPaymentAccount implements Ban
         return ((SepaAccountPayload) paymentAccountPayload).getBic();
     }
 
+
+    public void setEmail(String email) {
+        ((SepaAccountPayload) paymentAccountPayload).setEmail(email);
+    }
+
+    public String getEmail() {
+        return ((SepaAccountPayload) paymentAccountPayload).getEmail();
+    }
+
     public List<String> getAcceptedCountryCodes() {
         return ((SepaAccountPayload) paymentAccountPayload).getAcceptedCountryCodes();
     }

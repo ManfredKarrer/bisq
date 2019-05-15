@@ -21,6 +21,7 @@ import bisq.desktop.components.InputTextField;
 import bisq.desktop.util.FormBuilder;
 import bisq.desktop.util.Layout;
 import bisq.desktop.util.validation.BICValidator;
+import bisq.desktop.util.validation.EmailValidator;
 import bisq.desktop.util.validation.IBANValidator;
 
 import bisq.core.locale.Country;
@@ -52,12 +53,14 @@ import static bisq.desktop.util.FormBuilder.addTopLabelTextField;
 
 public class SepaForm extends GeneralSepaForm {
 
+    private final EmailValidator emailValidator;
+
     public static int addFormForBuyer(GridPane gridPane, int gridRow,
                                       PaymentAccountPayload paymentAccountPayload) {
         SepaAccountPayload sepaAccountPayload = (SepaAccountPayload) paymentAccountPayload;
 
-        final String title = Res.get("payment.account.owner");
-        final String value = sepaAccountPayload.getHolderName();
+        final String title = Res.get("payment.account.owner") + " / " + Res.get("payment.email");
+        final String value = sepaAccountPayload.getHolderName() + " / " + sepaAccountPayload.getEmail();
         addCompactTopLabelTextFieldWithCopyIcon(gridPane, ++gridRow, title, value);
 
         addCompactTopLabelTextFieldWithCopyIcon(gridPane, gridRow, 1,
@@ -80,6 +83,8 @@ public class SepaForm extends GeneralSepaForm {
         this.sepaAccount = (SepaAccount) paymentAccount;
         this.ibanValidator = ibanValidator;
         this.bicValidator = bicValidator;
+
+        emailValidator = new EmailValidator();
     }
 
     @Override
@@ -91,6 +96,14 @@ public class SepaForm extends GeneralSepaForm {
         holderNameInputTextField.setValidator(inputValidator);
         holderNameInputTextField.textProperty().addListener((ov, oldValue, newValue) -> {
             sepaAccount.setHolderName(newValue);
+            updateFromInputs();
+        });
+
+        InputTextField emailInputTextField = FormBuilder.addInputTextField(gridPane, ++gridRow,
+                Res.get("payment.email"));
+        emailInputTextField.setValidator(emailValidator);
+        emailInputTextField.textProperty().addListener((ov, oldValue, newValue) -> {
+            sepaAccount.setEmail(newValue);
             updateFromInputs();
         });
 
@@ -175,6 +188,7 @@ public class SepaForm extends GeneralSepaForm {
                 && bicValidator.validate(sepaAccount.getBic()).isValid
                 && ibanValidator.validate(sepaAccount.getIban()).isValid
                 && inputValidator.validate(sepaAccount.getHolderName()).isValid
+                && emailValidator.validate(sepaAccount.getEmail()).isValid
                 && sepaAccount.getAcceptedCountryCodes().size() > 0
                 && sepaAccount.getSingleTradeCurrency() != null
                 && sepaAccount.getCountry() != null);
@@ -187,6 +201,7 @@ public class SepaForm extends GeneralSepaForm {
         addCompactTopLabelTextField(gridPane, ++gridRow, Res.get("shared.paymentMethod"),
                 Res.get(sepaAccount.getPaymentMethod().getId()));
         addCompactTopLabelTextField(gridPane, ++gridRow, Res.get("payment.account.owner"), sepaAccount.getHolderName());
+        addCompactTopLabelTextField(gridPane, ++gridRow, Res.get("payment.email"), sepaAccount.getEmail());
         addCompactTopLabelTextField(gridPane, ++gridRow, IBAN, sepaAccount.getIban()).second.setMouseTransparent(false);
         addCompactTopLabelTextField(gridPane, ++gridRow, BIC, sepaAccount.getBic()).second.setMouseTransparent(false);
         addCompactTopLabelTextField(gridPane, ++gridRow, Res.get("payment.bank.country"),
