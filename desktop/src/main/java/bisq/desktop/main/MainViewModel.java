@@ -24,6 +24,7 @@ import bisq.desktop.components.TxIdTextField;
 import bisq.desktop.main.overlays.Overlay;
 import bisq.desktop.main.overlays.notifications.NotificationCenter;
 import bisq.desktop.main.overlays.popups.Popup;
+import bisq.desktop.main.overlays.windows.AddEmailToAccountWindow;
 import bisq.desktop.main.overlays.windows.DaoLaunchWindow;
 import bisq.desktop.main.overlays.windows.DisplayAlertMessageWindow;
 import bisq.desktop.main.overlays.windows.TacWindow;
@@ -45,6 +46,7 @@ import bisq.core.locale.Res;
 import bisq.core.payment.AccountAgeWitnessService;
 import bisq.core.payment.AliPayAccount;
 import bisq.core.payment.CryptoCurrencyAccount;
+import bisq.core.payment.SepaAccount;
 import bisq.core.presentation.BalancePresentation;
 import bisq.core.presentation.DisputePresentation;
 import bisq.core.presentation.TradePresentation;
@@ -85,9 +87,11 @@ import javafx.collections.ObservableList;
 
 import java.util.Comparator;
 import java.util.Date;
+import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -265,6 +269,7 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
         notificationCenter.onAllServicesAndViewsInitialized();
 
         maybeAddDaoLaunchWindowToQueue();
+        maybeAddUpdateSepaAccountWindowToQueue();
         maybeShowPopupsFromQueue();
     }
 
@@ -634,6 +639,21 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
                 popupQueue.add(daoLaunchWindow);
 
                 DontShowAgainLookup.dontShowAgain(daoLaunchPopupKey, true);
+            }
+        }
+    }
+
+    private void maybeAddUpdateSepaAccountWindowToQueue() {
+        if (user.getPaymentAccounts() != null) {
+            List<SepaAccount> list = user.getPaymentAccounts().stream()
+                    .filter(e -> e instanceof SepaAccount)
+                    .map(e -> (SepaAccount) e)
+                    .filter(sepaAccount -> sepaAccount.getEmail().isEmpty())
+                    .collect(Collectors.toList());
+            if (!list.isEmpty()) {
+                AddEmailToAccountWindow addEmailToAccountWindow = new AddEmailToAccountWindow(list, user);
+                addEmailToAccountWindow.setDisplayOrderPriority(10);
+                popupQueue.add(addEmailToAccountWindow);
             }
         }
     }
