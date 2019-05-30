@@ -17,6 +17,8 @@
 
 package bisq.core.payment;
 
+import bisq.core.account.witness.AccountAgeWitnessService;
+
 import bisq.common.crypto.CryptoException;
 import bisq.common.crypto.Sig;
 
