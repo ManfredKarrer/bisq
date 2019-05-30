@@ -15,9 +15,7 @@
  * along with Bisq. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package bisq.core.payment;
-
-import bisq.core.account.witness.AccountAgeWitnessService;
+package bisq.core.account.witness;
 
 import bisq.common.crypto.CryptoException;
 import bisq.common.crypto.Sig;
