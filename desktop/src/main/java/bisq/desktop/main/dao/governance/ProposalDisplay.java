@@ -29,6 +29,7 @@ import bisq.desktop.util.FormBuilder;
 import bisq.desktop.util.GUIUtil;
 import bisq.desktop.util.Layout;
 import bisq.desktop.util.validation.BsqValidator;
+import bisq.desktop.util.validation.RegexValidator;
 
 import bisq.core.btc.BaseCurrencyNetwork;
 import bisq.core.dao.DaoFacade;
@@ -38,6 +39,7 @@ import bisq.core.dao.governance.param.Param;
 import bisq.core.dao.governance.proposal.ProposalType;
 import bisq.core.dao.governance.proposal.param.ChangeParamInputValidator;
 import bisq.core.dao.governance.proposal.param.ChangeParamValidator;
+import bisq.core.dao.state.model.blockchain.BaseTx;
 import bisq.core.dao.state.model.blockchain.Tx;
 import bisq.core.dao.state.model.governance.Ballot;
 import bisq.core.dao.state.model.governance.BondedRoleType;
@@ -58,7 +60,6 @@ import bisq.core.locale.Res;
 import bisq.core.user.Preferences;
 import bisq.core.util.BsqFormatter;
 import bisq.core.util.validation.InputValidator;
-import bisq.core.util.validation.UrlInputValidator;
 
 import bisq.asset.Asset;
 
@@ -230,8 +231,20 @@ public class ProposalDisplay {
         linkInputTextField = addInputTextField(gridPane, ++gridRow,
                 Res.get("dao.proposal.display.link"));
         linkInputTextField.setPromptText(Res.get("dao.proposal.display.link.prompt"));
-        if (isMakeProposalScreen)
-            linkInputTextField.setValidator(new UrlInputValidator());
+        if (isMakeProposalScreen) {
+            RegexValidator validator = new RegexValidator();
+            if (proposalType == ProposalType.COMPENSATION_REQUEST) {
+                validator.setPattern("https://bisq.network/dao-compensation/\\d+");
+                linkInputTextField.setText("https://bisq.network/dao-compensation/#");
+            } else if (proposalType == ProposalType.REIMBURSEMENT_REQUEST) {
+                validator.setPattern("https://bisq.network/dao-reimbursement/\\d+");
+                linkInputTextField.setText("https://bisq.network/dao-reimbursement/#");
+            } else {
+                validator.setPattern("https://bisq.network/dao-proposals/\\d+");
+                linkInputTextField.setText("https://bisq.network/dao-proposals/#");
+            }
+            linkInputTextField.setValidator(validator);
+        }
         inputControls.add(linkInputTextField);
 
         Tuple3<Label, HyperlinkWithIcon, VBox> tuple = addTopLabelHyperlinkWithIcon(gridPane, gridRow,
@@ -465,6 +478,10 @@ public class ProposalDisplay {
     }
 
     public void applyBallotAndVoteWeight(@Nullable Ballot ballot, long merit, long stake) {
+        applyBallotAndVoteWeight(ballot, merit, stake, true);
+    }
+
+    public void applyBallotAndVoteWeight(@Nullable Ballot ballot, long merit, long stake, boolean ballotIncluded) {
         boolean ballotIsNotNull = ballot != null;
         boolean hasVoted = stake > 0;
         if (hasVoted) {
@@ -475,11 +492,12 @@ public class ProposalDisplay {
                         Res.get("dao.proposal.display.myVote.rejected");
             }
 
+            String voteIncluded = ballotIncluded ? "" : " - " + Res.get("dao.proposal.display.myVote.unCounted");
             String meritString = bsqFormatter.formatCoinWithCode(Coin.valueOf(merit));
             String stakeString = bsqFormatter.formatCoinWithCode(Coin.valueOf(stake));
             String weight = bsqFormatter.formatCoinWithCode(Coin.valueOf(merit + stake));
             String myVoteSummary = Res.get("dao.proposal.myVote.summary", myVote,
-                    weight, meritString, stakeString);
+                    weight, meritString, stakeString, voteIncluded);
             myVoteTextField.setText(myVoteSummary);
 
             GridPane.setRowSpan(myVoteTitledGroup, votingBoxRowSpan - 1);
@@ -530,6 +548,14 @@ public class ProposalDisplay {
             comboBoxValueTextField.setText(paramComboBox.getConverter().toString(changeParamProposal.getParam()));
             checkNotNull(paramValueTextField, "paramValueTextField must not be null");
             paramValueTextField.setText(bsqFormatter.formatParamValue(changeParamProposal.getParam(), changeParamProposal.getParamValue()));
+            String currentValue = bsqFormatter.formatParamValue(changeParamProposal.getParam(),
+                    daoFacade.getParamValue(changeParamProposal.getParam()));
+            int height = daoFacade.getTx(changeParamProposal.getTxId())
+                    .map(BaseTx::getBlockHeight)
+                    .orElse(daoFacade.getGenesisBlockHeight());
+            String valueAtProposal = bsqFormatter.formatParamValue(changeParamProposal.getParam(),
+                    daoFacade.getParamValue(changeParamProposal.getParam(), height));
+            paramValueTextField.setPromptText(Res.get("dao.param.currentAndPastValue", currentValue, valueAtProposal));
         } else if (proposal instanceof RoleProposal) {
             RoleProposal roleProposal = (RoleProposal) proposal;
             checkNotNull(bondedRoleTypeComboBox, "bondedRoleComboBox must not be null");
