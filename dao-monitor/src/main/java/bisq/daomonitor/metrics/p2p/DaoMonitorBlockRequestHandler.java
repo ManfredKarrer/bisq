@@ -17,6 +17,7 @@
 
 package bisq.daomonitor.metrics.p2p;
 
+import bisq.core.btc.wallet.BtcWalletService;
 import bisq.core.dao.node.full.RawBlock;
 import bisq.core.dao.node.messages.GetBlocksRequest;
 import bisq.core.dao.node.messages.GetBlocksResponse;
@@ -54,6 +55,7 @@ class DaoMonitorBlockRequestHandler implements MessageListener {
     private static final long TIMEOUT = 120;
     private NodeAddress peersNodeAddress;
     private long requestTs;
+    private int requestBlocksFrom;
 
 
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -75,6 +77,7 @@ class DaoMonitorBlockRequestHandler implements MessageListener {
     private final NetworkNode networkNode;
     private final DaoMetrics daoMetrics;
     private final Listener listener;
+    private final BtcWalletService btcWalletService;
     private Timer timeoutTimer;
     private final int nonce = new Random().nextInt();
     private boolean stopped;
@@ -84,10 +87,12 @@ class DaoMonitorBlockRequestHandler implements MessageListener {
     // Constructor
     ///////////////////////////////////////////////////////////////////////////////////////////
 
-    public DaoMonitorBlockRequestHandler(NetworkNode networkNode, DaoMetrics daoMetrics, Listener listener) {
+    public DaoMonitorBlockRequestHandler(NetworkNode networkNode, DaoMetrics daoMetrics,
+                                         BtcWalletService btcWalletService, Listener listener) {
         this.networkNode = networkNode;
         this.daoMetrics = daoMetrics;
         this.listener = listener;
+        this.btcWalletService = btcWalletService;
     }
 
     public void cancel() {
@@ -103,8 +108,17 @@ class DaoMonitorBlockRequestHandler implements MessageListener {
         peersNodeAddress = nodeAddress;
         requestTs = new Date().getTime();
         if (!stopped) {
-
-            GetBlocksRequest getBlocksRequest = new GetBlocksRequest(0, nonce, networkNode.getNodeAddress());
+            int lastBlockSeenHeight = btcWalletService.getLastBlockSeenHeight();
+            if (lastBlockSeenHeight <= 0) {
+                log.error("We have not got a block from BitcoinJ yet, we will delay that request for 60 sec.");
+                UserThread.runAfter(() -> {
+                    requestData(nodeAddress);
+                }, 60);
+                return;
+            }
+            requestBlocksFrom = lastBlockSeenHeight - 10;
+            log.info("requestBlocksFrom {}", requestBlocksFrom);
+            GetBlocksRequest getBlocksRequest = new GetBlocksRequest(requestBlocksFrom, nonce, networkNode.getNodeAddress());
             daoMetrics.setLastDataRequestTs(System.currentTimeMillis());
 
             if (timeoutTimer != null) {
@@ -183,12 +197,13 @@ class DaoMonitorBlockRequestHandler implements MessageListener {
                     StringBuilder sb = new StringBuilder();
                     sb.append("\n#################################################################\n");
                     sb.append("Connected to node: ").append(peersNodeAddress.getFullAddress()).append("\n");
+                    sb.append("Requested blocks from ").append(requestBlocksFrom).append("\n");
                     sb.append("Received ").append(numBlocks).append(" blocks\n");
                     sb.append("#################################################################");
                     log.info(sb.toString());
 
                     HashMap<String, Integer> receivedObjects = new HashMap<>();
-                    receivedObjects.put("BSQ Blocks", numBlocks);
+                    receivedObjects.put("BSQ Blocks", requestBlocksFrom + numBlocks);
                     daoMetrics.getReceivedObjectsList().add(receivedObjects);
 
                     final long duration = new Date().getTime() - requestTs;

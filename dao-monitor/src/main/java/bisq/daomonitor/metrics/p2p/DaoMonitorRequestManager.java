@@ -17,6 +17,8 @@
 
 package bisq.daomonitor.metrics.p2p;
 
+import bisq.core.btc.wallet.BtcWalletService;
+
 import bisq.network.p2p.NodeAddress;
 import bisq.network.p2p.P2PService;
 import bisq.network.p2p.P2PServiceListener;
@@ -65,6 +67,7 @@ public class DaoMonitorRequestManager implements ConnectionListener {
     private P2PDataStorage dataStorage;
     private SeedNodeRepository seedNodeRepository;
     private DaoMetricsModel daoMetricsModel;
+    private final BtcWalletService btcWalletService;
     private final Set<NodeAddress> seedNodeAddresses;
 
     private final Map<NodeAddress, DaoMonitorP2PDataRequestHandler> p2pDataHandlerMap = new HashMap<>();
@@ -88,11 +91,13 @@ public class DaoMonitorRequestManager implements ConnectionListener {
                                     P2PService p2PService,
                                     P2PDataStorage dataStorage,
                                     SeedNodeRepository seedNodeRepository,
-                                    DaoMetricsModel daoMetricsModel) {
+                                    DaoMetricsModel daoMetricsModel,
+                                    BtcWalletService btcWalletService) {
         this.networkNode = networkNode;
         this.dataStorage = dataStorage;
         this.seedNodeRepository = seedNodeRepository;
         this.daoMetricsModel = daoMetricsModel;
+        this.btcWalletService = btcWalletService;
 
         this.networkNode.addConnectionListener(this);
 
@@ -204,6 +209,7 @@ public class DaoMonitorRequestManager implements ConnectionListener {
                 DaoMetrics blockMetrics = daoMetricsModel.getBlockMetrics(nodeAddress);
                 DaoMonitorBlockRequestHandler requestDataHandler = new DaoMonitorBlockRequestHandler(networkNode,
                         blockMetrics,
+                        btcWalletService,
                         new DaoMonitorBlockRequestHandler.Listener() {
                             @Override
                             public void onComplete() {
