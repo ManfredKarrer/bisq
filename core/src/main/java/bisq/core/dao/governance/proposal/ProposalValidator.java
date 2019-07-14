@@ -55,7 +55,7 @@ public abstract class ProposalValidator implements ConsensusCritical {
             validateDataFields(proposal);
             return true;
         } catch (ProposalValidationException e) {
-            log.warn("proposal data fields are invalid. proposal={}, error={}", proposal, e.toString());
+            log.debug("proposal data fields are invalid. proposal={}, error={}", proposal, e.toString());
             return false;
         }
     }

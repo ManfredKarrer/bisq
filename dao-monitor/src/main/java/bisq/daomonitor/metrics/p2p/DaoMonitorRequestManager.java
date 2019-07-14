@@ -166,7 +166,7 @@ public class DaoMonitorRequestManager implements ConnectionListener {
         stopAllRetryTimers();
         //closeAllConnections();
         // we give 1 sec. for all connection shutdown
-        final int[] delay = {1000};
+        final int[] delay = {100};
         daoMetricsModel.setLastCheckTs(System.currentTimeMillis());
 
         seedNodeAddresses.stream().forEach(nodeAddress -> {
@@ -200,7 +200,7 @@ public class DaoMonitorRequestManager implements ConnectionListener {
 
     private void requestFromNode(NodeAddress nodeAddress) {
         requestP2PDataFromNode(nodeAddress);
-        UserThread.runAfter(() -> requestBlocksFromNode(nodeAddress), 10);
+        UserThread.runAfter(() -> requestBlocksFromNode(nodeAddress), 30);
     }
 
     private void requestBlocksFromNode(NodeAddress nodeAddress) {
@@ -242,7 +242,7 @@ public class DaoMonitorRequestManager implements ConnectionListener {
                                 if (retryCounter < MAX_RETRIES) {
                                     log.info("We got an error at peer={}. We will try again after a delay of {} sec. error={} ",
                                             nodeAddress, RETRY_DELAY_SEC, errorMessage);
-                                    final Timer timer = UserThread.runAfter(() -> requestFromNode(nodeAddress), RETRY_DELAY_SEC);
+                                    final Timer timer = UserThread.runAfter(() -> requestBlocksFromNode(nodeAddress), RETRY_DELAY_SEC);
                                     blocksRetryTimerMap.put(nodeAddress, timer);
                                     blocksRetryCounterMap.put(nodeAddress, ++retryCounter);
                                 } else {
@@ -319,7 +319,7 @@ public class DaoMonitorRequestManager implements ConnectionListener {
                                 if (retryCounter < MAX_RETRIES) {
                                     log.info("We got an error at peer={}. We will try again after a delay of {} sec. error={} ",
                                             nodeAddress, RETRY_DELAY_SEC, errorMessage);
-                                    final Timer timer = UserThread.runAfter(() -> requestFromNode(nodeAddress), RETRY_DELAY_SEC);
+                                    final Timer timer = UserThread.runAfter(() -> requestP2PDataFromNode(nodeAddress), RETRY_DELAY_SEC);
                                     p2pDataRetryTimerMap.put(nodeAddress, timer);
                                     p2pDataRetryCounterMap.put(nodeAddress, ++retryCounter);
                                 } else {

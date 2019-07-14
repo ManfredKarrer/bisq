@@ -17,30 +17,24 @@
 
 package bisq.daomonitor.metrics;
 
-import bisq.core.btc.nodes.BtcNodes;
-import bisq.core.btc.setup.WalletsSetup;
-import bisq.core.locale.Res;
+import bisq.core.network.p2p.seed.DefaultSeedNodeRepository;
 
 import bisq.network.p2p.NodeAddress;
-import bisq.network.p2p.seed.SeedNodeRepository;
 
 import bisq.common.util.MathUtils;
-import bisq.common.util.Tuple2;
-
-import org.bitcoinj.core.Peer;
 
 import javax.inject.Inject;
-
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.time.DurationFormatUtils;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 
-import java.net.InetAddress;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -63,30 +57,18 @@ public class DaoMetricsModel {
     private String resultAsString;
     @Getter
     private String resultAsHtml;
-    private SeedNodeRepository seedNodeRepository;
-    private BtcNodes btcNodes;
     @Setter
     private long lastCheckTs;
     private long btcNodeUptimeTs;
     private int totalErrors = 0;
     private Map<NodeAddress, DaoMetrics> p2pDataMap = new HashMap<>();
     private Map<NodeAddress, DaoMetrics> blocksMap = new HashMap<>();
-    private List<Peer> connectedPeers;
-    private Map<Tuple2<BtcNodes.BtcNode, Boolean>, Integer> btcNodeDownTimeMap = new HashMap<>();
-    private Map<Tuple2<BtcNodes.BtcNode, Boolean>, Integer> btcNodeUpTimeMap = new HashMap<>();
     @Getter
     private Set<NodeAddress> nodesInError = new HashSet<>();
+    private final Map<String, String> operatorMap = new HashMap<>();
 
     @Inject
-    public DaoMetricsModel(SeedNodeRepository seedNodeRepository,
-                           BtcNodes btcNodes,
-                           WalletsSetup walletsSetup) {
-        this.seedNodeRepository = seedNodeRepository;
-        this.btcNodes = btcNodes;
-
-        walletsSetup.connectedPeersProperty().addListener((observable, oldValue, newValue) -> {
-            connectedPeers = newValue;
-        });
+    public DaoMetricsModel() {
     }
 
     public void addToP2PDataMap(NodeAddress nodeAddress, DaoMetrics daoMetrics) {
@@ -106,6 +88,19 @@ public class DaoMetricsModel {
     }
 
     public void updateReport() {
+        if (operatorMap.isEmpty()) {
+            InputStream fileInputStream = DefaultSeedNodeRepository.class.getClassLoader().getResourceAsStream("btc_mainnet.seednodes");
+            BufferedReader seedNodeFile = new BufferedReader(new InputStreamReader(fileInputStream));
+            seedNodeFile.lines().forEach(line -> {
+                if (!line.startsWith("#")) {
+                    String[] strings = line.split(" \\(@");
+                    String node = strings[0];
+                    String operator = strings[1];
+                    operatorMap.put(node, operator);
+                }
+            });
+        }
+
         if (btcNodeUptimeTs == 0)
             btcNodeUptimeTs = new Date().getTime();
 
@@ -126,6 +121,7 @@ public class DaoMetricsModel {
         });
 
         List<Map.Entry<NodeAddress, DaoMetrics>> entryList = new ArrayList<>(mergedMap.entrySet());
+        entryList.sort(Comparator.comparing(o -> o.getKey().getFullAddress()));
 
         totalErrors = 0;
         entryList.forEach(e -> {
@@ -152,7 +148,7 @@ public class DaoMetricsModel {
         Calendar calendar = new GregorianCalendar();
         calendar.setTimeZone(TimeZone.getTimeZone("CET"));
         calendar.setTimeInMillis(lastCheckTs);
-        final String time = calendar.getTime().toString();
+        String time = calendar.getTime().toString();
 
         StringBuilder html = new StringBuilder();
         html.append("<html>" +
@@ -191,6 +187,7 @@ public class DaoMetricsModel {
             if (averageOptional.isPresent())
                 durationAverage = averageOptional.getAsDouble() / 1000;
             final NodeAddress nodeAddress = e.getKey();
+            final String operator = operatorMap.get(nodeAddress.getFullAddress());
             final List<String> errorMessages = daoMetrics.getErrorMessages();
             final int numErrors = (int) errorMessages.stream().filter(s -> !s.isEmpty()).count();
             int numRequests = allDurations.size();
@@ -213,7 +210,8 @@ public class DaoMetricsModel {
             final String responseTs = daoMetrics.getLastDataResponseTs() > 0 ? dateFormat.format(new Date(daoMetrics.getLastDataResponseTs())) : "" + "<br/>";
             final String numRequestAttempts = daoMetrics.getNumRequestAttempts() + "<br/>";
 
-            sb.append("\nNode address: ").append(nodeAddress)
+            sb.append("\nOperator: ").append(operator)
+                    .append("\nNode address: ").append(nodeAddress)
                     .append("\nTotal num requests: ").append(numRequests)
                     .append("\nTotal num errors: ").append(numErrors)
                     .append("\nLast request: ").append(requestTs)
@@ -226,6 +224,7 @@ public class DaoMetricsModel {
             String colorNumErrors = lastIndexOfError == numErrors ? "black" : "red";
             String colorDurationAverage = durationAverage < 30 ? "black" : "red";
             html.append("<tr>")
+                    .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + operator + "</font> ").append("</td>")
                     .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + nodeAddress + "</font> ").append("</td>")
                     .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + numRequests + "</font> ").append("</td>")
                     .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + numErrors + "</font> ").append("</td>")
@@ -260,193 +259,16 @@ public class DaoMetricsModel {
                 html.append("</td></tr>");
             }
         });
-        html.append("</table>");
-        html.append("<pre>" +
-                "\nOperators:\n" +
-                "5quyxpxheyvzmb2d.onion:8000 (@miker)\n" +
-                "s67qglwhkgkyvr74.onion:8000 (@emzy)\n" +
-                "ef5qnzx6znifo3df.onion:8000 (@alexej996)\n" +
-                "jhgcy2won7xnslrb.onion:8000 (@alexej996)\n" +
-                "3f3cu2yw7u457ztq.onion:8000 (@devinbileck)\n" +
-                "723ljisnynbtdohi.onion:8000 (@emzy)\n" +
-                "rm7b56wbrcczpjvl.onion:8000 (@miker)\n" +
-                "fl3mmribyxgrv63c.onion:8000 (@devinbileck)" +
-                "</pre>");
-
-        // btc nodes
-        sb.append("\n\n####################################\n\nBitcoin nodes\n");
-        final long elapsed = new Date().getTime() - btcNodeUptimeTs;
-        Set<String> connectedBtcPeers = connectedPeers.stream()
-                .map(e -> {
-                    String hostname = e.getAddress().getHostname();
-                    InetAddress inetAddress = e.getAddress().getAddr();
-                    int port = e.getAddress().getPort();
-                    if (hostname != null)
-                        return hostname + ":" + port;
-                    else if (inetAddress != null)
-                        return inetAddress.getHostAddress() + ":" + port;
-                    else
-                        return "";
-                })
-                .collect(Collectors.toSet());
-
-        List<BtcNodes.BtcNode> onionBtcNodes = new ArrayList<>(btcNodes.getProvidedBtcNodes().stream()
-                .filter(BtcNodes.BtcNode::hasOnionAddress)
-                .collect(Collectors.toSet()));
-        onionBtcNodes.sort((o1, o2) -> o1.getOperator() != null && o2.getOperator() != null ?
-                o1.getOperator().compareTo(o2.getOperator()) : 0);
-
-        printTableHeader(html, "Onion");
-        printTable(html, sb, onionBtcNodes, connectedBtcPeers, elapsed, true);
-        html.append("</tr></table>");
-
-        List<BtcNodes.BtcNode> clearNetNodes = new ArrayList<>(btcNodes.getProvidedBtcNodes().stream()
-                .filter(BtcNodes.BtcNode::hasClearNetAddress)
-                .collect(Collectors.toSet()));
-        clearNetNodes.sort((o1, o2) -> o1.getOperator() != null && o2.getOperator() != null ?
-                o1.getOperator().compareTo(o2.getOperator()) : 0);
-
-        printTableHeader(html, "Clear net");
-        printTable(html, sb, clearNetNodes, connectedBtcPeers, elapsed, false);
-        sb.append("\nConnected Bitcoin nodes: " + connectedBtcPeers + "\n");
-        html.append("</tr></table>");
-        html.append("<br>Connected Bitcoin nodes: " + connectedBtcPeers + "<br>");
-        btcNodeUptimeTs = new Date().getTime();
-
-        html.append("</body></html>");
+        html.append("</table></body></html>");
 
         resultAsString = sb.toString();
         resultAsHtml = html.toString();
-    }
-
-    private void printTableHeader(StringBuilder html, String type) {
-        html.append("<br><h3>Bitcoin " + type + " nodes<h3><table style=\"width:100%\">" +
-                "<tr>" +
-                "<th align=\"left\">Operator</th>" +
-                "<th align=\"left\">Domain name</th>" +
-                "<th align=\"left\">IP address</th>" +
-                "<th align=\"left\">Btc node onion address</th>" +
-                "<th align=\"left\">UpTime</th>" +
-                "<th align=\"left\">DownTime</th>" +
-                "</tr>");
-    }
-
-    private void printTable(StringBuilder html, StringBuilder sb, List<BtcNodes.BtcNode> allBtcNodes, Set<String> connectedBtcPeers, long elapsed, boolean isOnion) {
-        allBtcNodes.stream().forEach(node -> {
-            int upTime = 0;
-            int downTime = 0;
-            Tuple2<BtcNodes.BtcNode, Boolean> key = new Tuple2<>(node, isOnion);
-            if (btcNodeUpTimeMap.containsKey(key))
-                upTime = btcNodeUpTimeMap.get(key);
-
-            key = new Tuple2<>(node, isOnion);
-            if (btcNodeDownTimeMap.containsKey(key))
-                downTime = btcNodeDownTimeMap.get(key);
-
-            boolean isConnected = false;
-            // return !connectedBtcPeers.contains(host);
-            if (node.hasOnionAddress() && connectedBtcPeers.contains(node.getOnionAddress() + ":" + node.getPort()))
-                isConnected = true;
-
-            final String clearNetHost = node.getAddress() != null ? node.getAddress() + ":" + node.getPort() : node.getHostName() + ":" + node.getPort();
-            if (node.hasClearNetAddress() && connectedBtcPeers.contains(clearNetHost))
-                isConnected = true;
-
-            if (isConnected) {
-                upTime += elapsed;
-                btcNodeUpTimeMap.put(key, upTime);
-            } else {
-                downTime += elapsed;
-                btcNodeDownTimeMap.put(key, downTime);
-            }
-
-            String upTimeString = formatDurationAsWords(upTime, true);
-            String downTimeString = formatDurationAsWords(downTime, true);
-            String colorNumErrors = isConnected ? "black" : "red";
-            html.append("<tr>")
-                    .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + node.getOperator() + "</font> ").append("</td>")
-                    .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + node.getHostName() + "</font> ").append("</td>")
-                    .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + node.getAddress() + "</font> ").append("</td>")
-                    .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + node.getOnionAddress() + "</font> ").append("</td>")
-                    .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + upTimeString + "</font> ").append("</td>")
-                    .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + downTimeString + "</font> ").append("</td>");
-
-            sb.append("\nOperator: ").append(node.getOperator()).append("\n");
-            sb.append("Domain name: ").append(node.getHostName()).append("\n");
-            sb.append("IP address: ").append(node.getAddress()).append("\n");
-            sb.append("Btc node onion address: ").append(node.getOnionAddress()).append("\n");
-            sb.append("UpTime: ").append(upTimeString).append("\n");
-            sb.append("DownTime: ").append(downTimeString).append("\n");
-        });
     }
 
     public void log() {
         log.info("\n\n#################################################################\n" +
                 resultAsString +
                 "#################################################################\n\n");
-    }
-
-    public static String formatDurationAsWords(long durationMillis, boolean showSeconds) {
-        String format;
-        String second = Res.get("time.second");
-        String minute = Res.get("time.minute");
-        String hour = Res.get("time.hour").toLowerCase();
-        String day = Res.get("time.day").toLowerCase();
-        String days = Res.get("time.days");
-        String hours = Res.get("time.hours");
-        String minutes = Res.get("time.minutes");
-        String seconds = Res.get("time.seconds");
-        if (showSeconds) {
-            format = "d\' " + days + ", \'H\' " + hours + ", \'m\' " + minutes + ", \'s\' " + seconds + "\'";
-        } else
-            format = "d\' " + days + ", \'H\' " + hours + ", \'m\' " + minutes + "\'";
-        String duration = DurationFormatUtils.formatDuration(durationMillis, format);
-        String tmp;
-        duration = " " + duration;
-        tmp = StringUtils.replaceOnce(duration, " 0 " + days, "");
-        if (tmp.length() != duration.length()) {
-            duration = tmp;
-            tmp = StringUtils.replaceOnce(tmp, " 0 " + hours, "");
-            if (tmp.length() != duration.length()) {
-                tmp = StringUtils.replaceOnce(tmp, " 0 " + minutes, "");
-                duration = tmp;
-                if (tmp.length() != tmp.length()) {
-                    duration = StringUtils.replaceOnce(tmp, " 0 " + seconds, "");
-                }
-            }
-        }
-
-        if (duration.length() != 0) {
-            duration = duration.substring(1);
-        }
-
-        tmp = StringUtils.replaceOnce(duration, " 0 " + seconds, "");
-
-        if (tmp.length() != duration.length()) {
-            duration = tmp;
-            tmp = StringUtils.replaceOnce(tmp, " 0 " + minutes, "");
-            if (tmp.length() != duration.length()) {
-                duration = tmp;
-                tmp = StringUtils.replaceOnce(tmp, " 0 " + hours, "");
-                if (tmp.length() != duration.length()) {
-                    duration = StringUtils.replaceOnce(tmp, " 0 " + days, "");
-                }
-            }
-        }
-
-        duration = " " + duration;
-        duration = StringUtils.replaceOnce(duration, " 1 " + seconds, " 1 " + second);
-        duration = StringUtils.replaceOnce(duration, " 1 " + minutes, " 1 " + minute);
-        duration = StringUtils.replaceOnce(duration, " 1 " + hours, " 1 " + hour);
-        duration = StringUtils.replaceOnce(duration, " 1 " + days, " 1 " + day);
-        duration = duration.trim();
-        if (duration.equals(","))
-            duration = duration.replace(",", "");
-        if (duration.startsWith(" ,"))
-            duration = duration.replace(" ,", "");
-        else if (duration.startsWith(", "))
-            duration = duration.replace(", ", "");
-        return duration;
     }
 
     public void addNodesInError(NodeAddress nodeAddress) {
