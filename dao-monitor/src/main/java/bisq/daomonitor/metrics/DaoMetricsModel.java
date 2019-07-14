@@ -125,8 +125,7 @@ public class DaoMetricsModel {
             });
         });
 
-        List<Map.Entry<NodeAddress, DaoMetrics>> entryList = mergedMap.entrySet().stream()
-                .collect(Collectors.toList());
+        List<Map.Entry<NodeAddress, DaoMetrics>> entryList = new ArrayList<>(mergedMap.entrySet());
 
         totalErrors = 0;
         entryList.forEach(e -> {
@@ -192,7 +191,6 @@ public class DaoMetricsModel {
             if (averageOptional.isPresent())
                 durationAverage = averageOptional.getAsDouble() / 1000;
             final NodeAddress nodeAddress = e.getKey();
-            final String operator = "N/A";
             final List<String> errorMessages = daoMetrics.getErrorMessages();
             final int numErrors = (int) errorMessages.stream().filter(s -> !s.isEmpty()).count();
             int numRequests = allDurations.size();
@@ -205,6 +203,7 @@ public class DaoMetricsModel {
                     lastErrorMsg = "Error at request " + lastIndexOfError + ":" + msg;
                 }
             }
+
             //  String lastErrorMsg = numErrors > 0 ? errorMessages.get(errorMessages.size() - 1) : "";
             final List<Map<String, Integer>> allReceivedData = daoMetrics.getReceivedObjectsList();
             Map<String, Integer> lastReceivedData = !allReceivedData.isEmpty() ? allReceivedData.get(allReceivedData.size() - 1) : new HashMap<>();
@@ -214,8 +213,7 @@ public class DaoMetricsModel {
             final String responseTs = daoMetrics.getLastDataResponseTs() > 0 ? dateFormat.format(new Date(daoMetrics.getLastDataResponseTs())) : "" + "<br/>";
             final String numRequestAttempts = daoMetrics.getNumRequestAttempts() + "<br/>";
 
-            sb.append("\nOperator: ").append(operator)
-                    .append("\nNode address: ").append(nodeAddress)
+            sb.append("\nNode address: ").append(nodeAddress)
                     .append("\nTotal num requests: ").append(numRequests)
                     .append("\nTotal num errors: ").append(numErrors)
                     .append("\nLast request: ").append(requestTs)
@@ -228,7 +226,6 @@ public class DaoMetricsModel {
             String colorNumErrors = lastIndexOfError == numErrors ? "black" : "red";
             String colorDurationAverage = durationAverage < 30 ? "black" : "red";
             html.append("<tr>")
-                    .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + operator + "</font> ").append("</td>")
                     .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + nodeAddress + "</font> ").append("</td>")
                     .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + numRequests + "</font> ").append("</td>")
                     .append("<td>").append("<font color=\"" + colorNumErrors + "\">" + numErrors + "</font> ").append("</td>")
@@ -264,6 +261,17 @@ public class DaoMetricsModel {
             }
         });
         html.append("</table>");
+        html.append("<pre>" +
+                "\nOperators:\n" +
+                "5quyxpxheyvzmb2d.onion:8000 (@miker)\n" +
+                "s67qglwhkgkyvr74.onion:8000 (@emzy)\n" +
+                "ef5qnzx6znifo3df.onion:8000 (@alexej996)\n" +
+                "jhgcy2won7xnslrb.onion:8000 (@alexej996)\n" +
+                "3f3cu2yw7u457ztq.onion:8000 (@devinbileck)\n" +
+                "723ljisnynbtdohi.onion:8000 (@emzy)\n" +
+                "rm7b56wbrcczpjvl.onion:8000 (@miker)\n" +
+                "fl3mmribyxgrv63c.onion:8000 (@devinbileck)" +
+                "</pre>");
 
         // btc nodes
         sb.append("\n\n####################################\n\nBitcoin nodes\n");
