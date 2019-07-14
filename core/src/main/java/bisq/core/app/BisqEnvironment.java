@@ -343,10 +343,10 @@ public class BisqEnvironment extends StandardEnvironment {
                 "Bisq";
         useAllProvidedNodes = commandLineProperties.containsProperty(BtcOptionKeys.USE_ALL_PROVIDED_NODES) ?
                 (String) commandLineProperties.getProperty(BtcOptionKeys.USE_ALL_PROVIDED_NODES) :
-                "true";
+                "false";
         numConnectionForBtc = commandLineProperties.containsProperty(BtcOptionKeys.NUM_CONNECTIONS_FOR_BTC) ?
                 (String) commandLineProperties.getProperty(BtcOptionKeys.NUM_CONNECTIONS_FOR_BTC) :
-                "50";
+                "9";
         ignoreLocalBtcNode = commandLineProperties.containsProperty(BtcOptionKeys.IGNORE_LOCAL_BTC_NODE) ?
                 (String) commandLineProperties.getProperty(BtcOptionKeys.IGNORE_LOCAL_BTC_NODE) :
                 "false";
